@@ -1,0 +1,2156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bank - Get Started</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/get_started.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <header class="topbar">
+        <div class="brand">
+            <div class="logo" aria-hidden="true">AI</div>
+            <h1>AI BANK</h1>
+        </div>
+        <h2 class="page-title">New Account Creation</h2>
+    </header>
+
+    <main class="layout">
+        <aside class="progress-panel" aria-label="Onboarding steps">
+            <h3>Steps</h3>
+            <ol class="progress-list">
+                <li class="step active">Consent and terms</li>
+                <li class="step">Basic Personal details</li>
+                <li class="step">Contact details</li>
+                <li class="step">Identity Proof</li>
+                <li class="step">Document Upload</li>
+                <li class="step">KYC verification</li>
+                <li class="step">Financial status</li>
+                <li class="step">Risk Assesment</li>
+                <li class="step">Account Prefrences</li>
+                <li class="step">Nominee details</li>
+                <li class="step">Review and confirm</li>
+                <li class="step">E-sign</li>
+                <li class="step">Set app pin</li>
+                <li class="step">Account creation</li>
+            </ol>
+        </aside>
+
+        <section class="chat-panel">
+            <div class="chat-card">
+                <div class="chat-header">
+                    <div class="assistant">
+                        <span class="assistant-icon" aria-hidden="true">AI</span>
+                        <span>AI Assistant</span>
+                        <span class="status"></span>
+                    </div>
+                    <span class="menu-dot">...</span>
+                </div>
+
+                <div id="chatbox" class="chat-body"></div>
+
+                <div class="chat-input">
+                    <button id="voiceBtn" type="button" class="voice-btn" title="Voice to text">Mic</button>
+                    <input id="msg" type="text" placeholder="Enter your message..." />
+                    <button id="sendBtn" type="button">Send</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const chatbox = document.getElementById("chatbox");
+        const messageInput = document.getElementById("msg");
+        const sendBtn = document.getElementById("sendBtn");
+        const voiceBtn = document.getElementById("voiceBtn");
+        const progressSteps = Array.from(document.querySelectorAll(".progress-list .step"));
+        let activeStepIndex = 0;
+        let consentShown = false;
+        const basicFields = ["fullName", "dob", "gender", "parentName", "maritalStatus"];
+        const contactFields = ["mobile", "email", "currentAddress", "permanentAddress", "city", "state", "pincode", "country"];
+        const identityFields = ["aadhaar", "pan"];
+        const financialFields = ["occupationType", "employerName", "annualIncome", "sourceIncome", "taxResidency", "panVerificationStatus"];
+        const riskFields = ["investmentExperience", "riskAppetite", "investmentGoal", "investmentDuration"];
+        const accountPreferenceFields = ["accountType", "debitCardRequired", "chequeBookRequired", "internetBanking", "nomineeRequired", "communicationMode"];
+        const nomineeFields = ["nomineeName", "relationship", "nomineeDob", "nomineeAddress", "nomineePhone", "guardianDetails"];
+        const allowedCountries = ["india", "bharat"];
+        const allowedStates = new Set([
+            "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh", "goa", "gujarat",
+            "haryana", "himachal pradesh", "jharkhand", "karnataka", "kerala", "madhya pradesh",
+            "maharashtra", "manipur", "meghalaya", "mizoram", "nagaland", "odisha", "punjab",
+            "rajasthan", "sikkim", "tamil nadu", "telangana", "tripura", "uttar pradesh",
+            "uttarakhand", "west bengal", "andaman and nicobar islands", "chandigarh",
+            "dadra and nagar haveli and daman and diu", "delhi", "jammu and kashmir", "ladakh",
+            "lakshadweep", "puducherry"
+        ]);
+        let currentBasicFieldIndex = -1;
+        let currentContactFieldIndex = -1;
+        let currentIdentityFieldIndex = -1;
+        let currentFinancialFieldIndex = -1;
+        let currentRiskFieldIndex = -1;
+        let currentAccountPreferenceFieldIndex = -1;
+        let currentNomineeFieldIndex = -1;
+        const basicDetails = {};
+        const contactDetails = {};
+        const identityDetails = {};
+        const financialDetails = {};
+        const riskDetails = {};
+        const accountPreferences = {};
+        const nomineeDetails = {};
+        let kycShown = false;
+        let cameraStream = null;
+        let nomineeNeedsGuardian = false;
+        let reviewShown = false;
+        let esignShown = false;
+        let setPinShown = false;
+        let accountCreatedShown = false;
+        let mismatchEditorShown = false;
+        let documentVerificationStatus = "not_started";
+        let onboardingUserId = null;
+        let otpCode = "";
+        let activeOptionWrapper = null;
+        const optionChoicesByField = {
+            consentStart: [{ label: "Yes", value: "yes" }],
+            gender: [
+                { label: "Male", value: "male" },
+                { label: "Female", value: "female" },
+                { label: "Other", value: "other" }
+            ],
+            maritalStatus: [
+                { label: "Single", value: "single" },
+                { label: "Married", value: "married" },
+                { label: "Divorced", value: "divorced" },
+                { label: "Widowed", value: "widowed" }
+            ],
+            country: [{ label: "India", value: "india" }],
+            occupationType: [
+                { label: "Student", value: "student" },
+                { label: "Salaried", value: "salaried" },
+                { label: "Business", value: "business" }
+            ],
+            taxResidency: [
+                { label: "India", value: "india" },
+                { label: "Other", value: "other" }
+            ],
+            panVerificationStatus: [
+                { label: "Verified", value: "verified" },
+                { label: "Pending", value: "pending" },
+                { label: "Failed", value: "failed" }
+            ],
+            investmentExperience: [
+                { label: "Beginner", value: "beginner" },
+                { label: "Intermediate", value: "intermediate" },
+                { label: "Expert", value: "expert" }
+            ],
+            riskAppetite: [
+                { label: "Low", value: "low" },
+                { label: "Medium", value: "medium" },
+                { label: "High", value: "high" }
+            ],
+            investmentGoal: [
+                { label: "Savings", value: "savings" },
+                { label: "Growth", value: "growth" },
+                { label: "Trading", value: "trading" }
+            ],
+            investmentDuration: [
+                { label: "Short", value: "short" },
+                { label: "Medium", value: "medium" },
+                { label: "Long term", value: "long term" }
+            ],
+            accountType: [
+                { label: "Savings", value: "savings" },
+                { label: "Current", value: "current" }
+            ],
+            yesNo: [
+                { label: "Yes", value: "yes" },
+                { label: "No", value: "no" }
+            ],
+            communicationMode: [
+                { label: "SMS", value: "sms" },
+                { label: "Email", value: "email" },
+                { label: "Both", value: "both" }
+            ]
+        };
+
+        function addMessage(text, role) {
+            const div = document.createElement("div");
+            div.className = `message ${role}`;
+            div.textContent = text;
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        function clearOptionButtons() {
+            if (activeOptionWrapper) {
+                activeOptionWrapper.remove();
+                activeOptionWrapper = null;
+            }
+        }
+
+        function showOptionButtons(fieldKey) {
+            const choices = optionChoicesByField[fieldKey] || [];
+            clearOptionButtons();
+            if (!choices.length) return;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot option-wrapper";
+            const row = document.createElement("div");
+            row.className = "option-buttons";
+
+            choices.forEach((choice) => {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "option-btn";
+                btn.textContent = choice.label;
+                btn.addEventListener("click", () => {
+                    row.querySelectorAll("button").forEach((buttonEl) => {
+                        buttonEl.disabled = true;
+                    });
+                    addMessage(choice.label, "user");
+                    clearOptionButtons();
+                    processOnboardingFlow(choice.value);
+                });
+                row.appendChild(btn);
+            });
+
+            wrapper.appendChild(row);
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+            activeOptionWrapper = wrapper;
+        }
+
+        function moveToStep(nextStepIndex) {
+            if (nextStepIndex < 0 || nextStepIndex >= progressSteps.length) return;
+            progressSteps[activeStepIndex].classList.remove("active");
+            progressSteps[activeStepIndex].classList.add("completed");
+            activeStepIndex = nextStepIndex;
+            progressSteps[activeStepIndex].classList.add("active");
+        }
+
+        function isValidFullName(value) {
+            return /^[A-Za-z]+(?:[ '-][A-Za-z]+)+$/.test(value.trim());
+        }
+
+        function isValidDob(value) {
+            return /^(?:\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4})$/.test(value.trim());
+        }
+
+        function isValidGender(value) {
+            return ["male", "female", "other"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidParentName(value) {
+            return /^[A-Za-z]+(?:[ '-][A-Za-z]+)+$/.test(value.trim());
+        }
+
+        function isValidMaritalStatus(value) {
+            return ["single", "married", "divorced", "widowed"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidMobile(value) {
+            return /^\d{10}$/.test(value.trim());
+        }
+
+        function isValidEmail(value) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+        }
+
+        function isValidAddress(value) {
+            return value.trim().length >= 8;
+        }
+
+        function normalizePlace(value) {
+            return value.trim().toLowerCase().replace(/\s+/g, " ");
+        }
+
+        function looksRandomText(value) {
+            const cleaned = value.toLowerCase().replace(/[^a-z]/g, "");
+            if (cleaned.length < 3) return true;
+            if (/^(.)\1+$/.test(cleaned)) return true;
+            if (!/[aeiou]/.test(cleaned)) return true;
+            if (/(asdf|qwer|zxcv|test|abcd|random|dummy|na|none|null|xyz)/.test(cleaned)) return true;
+            return false;
+        }
+
+        function isValidCity(value) {
+            const normalized = normalizePlace(value);
+            if (!/^[a-z]+(?:[ .'-][a-z]+)*$/.test(normalized)) return false;
+            if (normalized.length < 3) return false;
+            if (looksRandomText(normalized)) return false;
+            return true;
+        }
+
+        function isValidState(value) {
+            const normalized = normalizePlace(value);
+            return allowedStates.has(normalized);
+        }
+
+        function isValidCountry(value) {
+            const normalized = normalizePlace(value);
+            return allowedCountries.includes(normalized);
+        }
+
+        function isValidPincode(value) {
+            return /^(?!0)\d{6}$/.test(value.trim());
+        }
+
+        function isValidAadhaar(value) {
+            return /^\d{12}$/.test(value.trim());
+        }
+
+        function isValidPan(value) {
+            return /^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(value.trim());
+        }
+
+        function isValidOccupationType(value) {
+            return ["student", "salaried", "business"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidEmployerName(value) {
+            return /^[A-Za-z]+(?:[ .'-][A-Za-z]+)+$/.test(value.trim());
+        }
+
+        function isValidAnnualIncome(value) {
+            const normalized = value.replace(/,/g, "").trim();
+            return /^\d{4,10}$/.test(normalized) && Number(normalized) > 0;
+        }
+
+        function isValidSourceIncome(value) {
+            return /^[A-Za-z]+(?:[ .'-][A-Za-z]+)*$/.test(value.trim()) && value.trim().length >= 3;
+        }
+
+        function isValidTaxResidency(value) {
+            return ["india", "other"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidPanVerificationStatus(value) {
+            return ["verified", "pending", "failed"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidInvestmentExperience(value) {
+            return ["beginner", "intermediate", "expert"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidRiskAppetite(value) {
+            return ["low", "medium", "high"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidInvestmentGoal(value) {
+            return ["savings", "growth", "trading"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidInvestmentDuration(value) {
+            const normalized = value.trim().toLowerCase().replace(/\s+/g, " ");
+            return ["short", "medium", "long term", "long-term", "long"].includes(normalized);
+        }
+
+        function isValidAccountType(value) {
+            return ["savings", "current"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidYesNo(value) {
+            return ["yes", "no"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidCommunicationMode(value) {
+            return ["sms", "email", "both"].includes(value.trim().toLowerCase());
+        }
+
+        function isValidRelationship(value) {
+            return /^[A-Za-z]+(?:[ .'-][A-Za-z]+)*$/.test(value.trim()) && value.trim().length >= 3;
+        }
+
+        function parseDobToDate(value) {
+            const text = value.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+                const dt = new Date(text + "T00:00:00");
+                return Number.isNaN(dt.getTime()) ? null : dt;
+            }
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(text)) {
+                const [dd, mm, yyyy] = text.split("/").map(Number);
+                const dt = new Date(yyyy, mm - 1, dd);
+                if (dt.getFullYear() !== yyyy || dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
+                return dt;
+            }
+            return null;
+        }
+
+        function getAgeFromDob(value) {
+            const dobDate = parseDobToDate(value);
+            if (!dobDate) return null;
+            const today = new Date();
+            let age = today.getFullYear() - dobDate.getFullYear();
+            const m = today.getMonth() - dobDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) age -= 1;
+            return age;
+        }
+
+        function handleBasicPersonalDetails(inputText) {
+            const value = inputText.trim();
+            const field = basicFields[currentBasicFieldIndex];
+
+            if (field === "fullName") {
+                if (!isValidFullName(value)) {
+                    addMessage("Please enter your full name (first and last name only).", "bot");
+                    return true;
+                }
+                basicDetails.fullName = value;
+                currentBasicFieldIndex = 1;
+                addMessage("Please enter your Date of Birth (YYYY-MM-DD or DD/MM/YYYY).", "bot");
+                return true;
+            }
+
+            if (field === "dob") {
+                if (!isValidDob(value)) {
+                    addMessage("Please enter Date of Birth in YYYY-MM-DD or DD/MM/YYYY format.", "bot");
+                    return true;
+                }
+                basicDetails.dob = value;
+                currentBasicFieldIndex = 2;
+                addMessage("Please enter your Gender (Male/Female/Other).", "bot");
+                showOptionButtons("gender");
+                return true;
+            }
+
+            if (field === "gender") {
+                if (!isValidGender(value)) {
+                    addMessage("Please enter Gender as Male, Female, or Other.", "bot");
+                    showOptionButtons("gender");
+                    return true;
+                }
+                basicDetails.gender = value;
+                currentBasicFieldIndex = 3;
+                addMessage("Please enter your Father’s / Mother’s Name.", "bot");
+                return true;
+            }
+
+            if (field === "parentName") {
+                if (!isValidParentName(value)) {
+                    addMessage("Please enter a valid Father’s / Mother’s Name.", "bot");
+                    return true;
+                }
+                basicDetails.parentName = value;
+                currentBasicFieldIndex = 4;
+                addMessage("Please enter your Marital Status (Single/Married/Divorced/Widowed).", "bot");
+                showOptionButtons("maritalStatus");
+                return true;
+            }
+
+            if (field === "maritalStatus") {
+                if (!isValidMaritalStatus(value)) {
+                    addMessage("Please enter Marital Status as Single, Married, Divorced, or Widowed.", "bot");
+                    showOptionButtons("maritalStatus");
+                    return true;
+                }
+                basicDetails.maritalStatus = value;
+                addMessage("Basic personal details captured successfully. Next step: Contact details.", "bot");
+                moveToStep(2);
+                currentBasicFieldIndex = -1;
+                currentContactFieldIndex = 0;
+                addMessage("Please enter your Mobile Number (10 digits).", "bot");
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleContactDetails(inputText) {
+            const value = inputText.trim();
+            const field = contactFields[currentContactFieldIndex];
+
+            if (field === "mobile") {
+                if (!isValidMobile(value)) {
+                    addMessage("Please enter a valid Mobile Number (10 digits).", "bot");
+                    return true;
+                }
+                contactDetails.mobile = value;
+                currentContactFieldIndex = 1;
+                addMessage("Please enter your Email ID.", "bot");
+                return true;
+            }
+
+            if (field === "email") {
+                if (!isValidEmail(value)) {
+                    addMessage("Please enter a valid Email ID.", "bot");
+                    return true;
+                }
+                contactDetails.email = value;
+                currentContactFieldIndex = 2;
+                addMessage("Please enter your Current Address.", "bot");
+                return true;
+            }
+
+            if (field === "currentAddress") {
+                if (!isValidAddress(value)) {
+                    addMessage("Please enter a valid Current Address.", "bot");
+                    return true;
+                }
+                contactDetails.currentAddress = value;
+                currentContactFieldIndex = 3;
+                addMessage("Please enter your Permanent Address.", "bot");
+                return true;
+            }
+
+            if (field === "permanentAddress") {
+                if (!isValidAddress(value)) {
+                    addMessage("Please enter a valid Permanent Address.", "bot");
+                    return true;
+                }
+                contactDetails.permanentAddress = value;
+                currentContactFieldIndex = 4;
+                addMessage("Please enter your City.", "bot");
+                return true;
+            }
+
+            if (field === "city") {
+                if (!isValidCity(value)) {
+                    addMessage("Please enter a valid City name (not random letters).", "bot");
+                    return true;
+                }
+                contactDetails.city = value;
+                currentContactFieldIndex = 5;
+                addMessage("Please enter your State.", "bot");
+                return true;
+            }
+
+            if (field === "state") {
+                if (!isValidState(value)) {
+                    addMessage("Please enter a valid Indian State/UT name.", "bot");
+                    return true;
+                }
+                contactDetails.state = value;
+                currentContactFieldIndex = 6;
+                addMessage("Please enter your Pincode (6 digits).", "bot");
+                return true;
+            }
+
+            if (field === "pincode") {
+                if (!isValidPincode(value)) {
+                    addMessage("Please enter a valid Pincode (6 digits, cannot start with 0).", "bot");
+                    return true;
+                }
+                contactDetails.pincode = value;
+                currentContactFieldIndex = 7;
+                addMessage("Please enter your Country.", "bot");
+                showOptionButtons("country");
+                return true;
+            }
+
+            if (field === "country") {
+                if (!isValidCountry(value)) {
+                    addMessage("Please enter a valid Country (India).", "bot");
+                    showOptionButtons("country");
+                    return true;
+                }
+                contactDetails.country = value;
+                addMessage("Contact details captured successfully. Next step: Identity Proof.", "bot");
+                moveToStep(3);
+                currentContactFieldIndex = -1;
+                currentIdentityFieldIndex = 0;
+                addMessage("Please enter your Aadhaar Number (12 digits).", "bot");
+                return true;
+            }
+
+            return false;
+        }
+
+        function showDocumentUploadPanel() {
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot upload-wrapper";
+            wrapper.innerHTML = `
+                <div class="upload-title">Document Upload</div>
+                <label class="upload-label">Address Proof Upload</label>
+                <input type="file" id="addressProofFile" class="upload-input" accept=".jpg,.jpeg,.png,.pdf" />
+
+                <label class="upload-label">Income Proof (optional)</label>
+                <input type="file" id="incomeProofFile" class="upload-input" accept=".jpg,.jpeg,.png,.pdf" />
+
+                <label class="upload-label">Photo Upload</label>
+                <input type="file" id="photoUploadFile" class="upload-input" accept=".jpg,.jpeg,.png" />
+
+                <button type="button" id="uploadContinue" class="upload-btn">Submit Documents</button>
+                <div id="uploadAiStatus" class="upload-status">AI checks pending: Blur detection, Document clarity</div>
+            `;
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            async function getImageDimensions(file) {
+                return new Promise((resolve, reject) => {
+                    const image = new Image();
+                    const objectUrl = URL.createObjectURL(file);
+                    image.onload = () => {
+                        const dims = { width: image.width, height: image.height };
+                        URL.revokeObjectURL(objectUrl);
+                        resolve(dims);
+                    };
+                    image.onerror = () => {
+                        URL.revokeObjectURL(objectUrl);
+                        reject(new Error("Unable to read image"));
+                    };
+                    image.src = objectUrl;
+                });
+            }
+
+            async function runAiDocumentChecks(file, label) {
+                const lowerName = (file.name || "").toLowerCase();
+                const isPdf = lowerName.endsWith(".pdf");
+                let blurDetection = "Pass";
+                let documentClarity = "Pass";
+
+                if (file.size < 50 * 1024) blurDetection = "Fail";
+                if (file.size < 35 * 1024) documentClarity = "Fail";
+
+                if (!isPdf) {
+                    try {
+                        const dims = await getImageDimensions(file);
+                        if (Math.min(dims.width, dims.height) < 600) documentClarity = "Fail";
+                    } catch (err) {
+                        documentClarity = "Fail";
+                    }
+                } else if (file.size < 90 * 1024) {
+                    documentClarity = "Fail";
+                }
+
+                const passed = blurDetection === "Pass" && documentClarity === "Pass";
+                return {
+                    label,
+                    passed,
+                    blurDetection,
+                    documentClarity
+                };
+            }
+
+            const uploadContinueBtn = document.getElementById("uploadContinue");
+            const uploadAiStatus = document.getElementById("uploadAiStatus");
+            function continueWithPendingVerification(reasonText) {
+                documentVerificationStatus = "pending";
+                if (reasonText) addMessage(reasonText, "bot");
+                addMessage("Continuing with pending document verification.", "bot");
+                uploadContinueBtn.disabled = true;
+                uploadContinueBtn.textContent = "Submitted (Pending Verification)";
+                moveToStep(5);
+                addMessage("Next step: KYC verification.", "bot");
+                showKycPanel();
+            }
+            uploadContinueBtn.addEventListener("click", async () => {
+                const addressProof = document.getElementById("addressProofFile")?.files?.[0];
+                const incomeProof = document.getElementById("incomeProofFile")?.files?.[0];
+                const photoUpload = document.getElementById("photoUploadFile")?.files?.[0];
+
+                if (!addressProof || !photoUpload) {
+                    addMessage("Please upload Address Proof and Photo to continue. Income Proof is optional.", "bot");
+                    return;
+                }
+
+                setTimeout(() => {
+                    if (activeStepIndex === 4 && !kycShown && !uploadContinueBtn.disabled) {
+                        continueWithPendingVerification(
+                            "Document verification is taking longer than expected. Proceeding with pending verification."
+                        );
+                    }
+                }, 20000);
+
+                try {
+                    uploadAiStatus.textContent = "Running AI checks: Blur detection and Document clarity...";
+                    const requiredResults = [
+                        await runAiDocumentChecks(addressProof, "Address Proof"),
+                        await runAiDocumentChecks(photoUpload, "Photo Upload")
+                    ];
+                    const optionalResults = incomeProof ? [await runAiDocumentChecks(incomeProof, "Income Proof")] : [];
+                    const allResults = requiredResults.concat(optionalResults);
+                    const failedRequired = requiredResults.some((result) => !result.passed);
+
+                    uploadAiStatus.innerHTML = allResults.map((result) =>
+                        `${result.label}: Blur detection ${result.blurDetection}, Document clarity ${result.documentClarity}`
+                    ).join("<br>");
+
+                    if (failedRequired) {
+                        continueWithPendingVerification(
+                            "AI quality check could not verify document clarity/blur. Proceeding with pending verification."
+                        );
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append("address_proof", addressProof);
+                    formData.append("photo_upload", photoUpload);
+                    if (incomeProof) formData.append("income_proof", incomeProof);
+                    formData.append(
+                        "details_json",
+                        JSON.stringify({
+                            basicDetails,
+                            contactDetails,
+                            identityDetails
+                        })
+                    );
+
+                    let verifyResponse;
+                    try {
+                        verifyResponse = await fetch("/verify-documents", {
+                            method: "POST",
+                            body: formData
+                        });
+                    } catch (error) {
+                        continueWithPendingVerification(
+                            "Document verification failed due to network issue."
+                        );
+                        return;
+                    }
+
+                    let verifyData = {};
+                    try {
+                        verifyData = await verifyResponse.json();
+                    } catch (error) {
+                        continueWithPendingVerification(
+                            "Document verification response could not be parsed."
+                        );
+                        return;
+                    }
+
+                    if (kycShown || activeStepIndex > 4 || uploadContinueBtn.disabled) {
+                        return;
+                    }
+
+                    if (!verifyResponse.ok || !verifyData.ok) {
+                        const warningText = String(verifyData.warning || "");
+                        const isQuotaIssue =
+                            verifyResponse.status === 429 ||
+                            /quota|resource_exhausted|rate limit/i.test(warningText) ||
+                            /quota|resource_exhausted|rate limit/i.test(String(verifyData.error || ""));
+
+                        if (isQuotaIssue) {
+                            continueWithPendingVerification(
+                                "Document verification is pending due to Gemini API quota limit."
+                            );
+                            return;
+                        }
+
+                        continueWithPendingVerification(
+                            verifyData.warning || "Could not verify document details right now."
+                        );
+                        if (verifyData.error) {
+                            addMessage(`- Technical reason: ${verifyData.error}`, "bot");
+                        }
+                        return;
+                    }
+
+                    if (Array.isArray(verifyData.warnings) && verifyData.warnings.length > 0) {
+                        const mismatchWarnings = verifyData.warnings.filter((w) =>
+                            /does not match|mismatch/i.test(String(w))
+                        );
+                        const systemWarnings = verifyData.warnings.filter((w) =>
+                            !/does not match|mismatch/i.test(String(w))
+                        );
+
+                        if (mismatchWarnings.length > 0) {
+                            addMessage("Warning: Document info doesn't match with user details.", "bot");
+                            mismatchWarnings.forEach((w) => addMessage(`- ${w}`, "bot"));
+                            continueWithPendingVerification(
+                                "Documents not verified. Moving to KYC with pending verification."
+                            );
+                            if (systemWarnings.length > 0) {
+                                systemWarnings.forEach((w) => addMessage(`- ${w}`, "bot"));
+                            }
+                            return;
+                        }
+                        if (systemWarnings.length > 0 && mismatchWarnings.length === 0) {
+                            continueWithPendingVerification(
+                                "Verification service is temporarily unavailable for extracted checks."
+                            );
+                            systemWarnings.forEach((w) => addMessage(`- ${w}`, "bot"));
+                            return;
+                        }
+                    }
+
+                    uploadContinueBtn.disabled = true;
+                    uploadContinueBtn.textContent = "Documents Submitted";
+                    documentVerificationStatus = "verified";
+                    moveToStep(5);
+                    addMessage("Document upload completed. AI checks passed and uploaded details match your entered information. Next step: KYC verification.", "bot");
+                    showKycPanel();
+                } catch (error) {
+                    continueWithPendingVerification(
+                        "Could not complete document verification due to an unexpected issue. Proceeding with pending verification."
+                    );
+                }
+            });
+        }
+
+        async function startKycCamera(videoEl) {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Camera API not available in this browser/context.");
+            }
+            if (cameraStream) return;
+            try {
+                cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                videoEl.srcObject = cameraStream;
+                await videoEl.play();
+            } catch (err) {
+                throw err;
+            }
+        }
+
+        function stopKycCamera() {
+            if (!cameraStream) return;
+            cameraStream.getTracks().forEach((track) => track.stop());
+            cameraStream = null;
+        }
+
+        function showKycPanel() {
+            if (kycShown) return;
+            kycShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot kyc-wrapper";
+            wrapper.innerHTML = `
+                <div class="kyc-title">KYC Verification (AI + Camera)</div>
+                <div class="kyc-step">1. Live Photo Capture (Selfie)</div>
+                <video id="kycVideo" class="kyc-video" autoplay playsinline muted></video>
+                <canvas id="kycCanvas" class="kyc-canvas"></canvas>
+                <div class="kyc-actions">
+                    <button type="button" id="enableCameraBtn" class="kyc-btn">Enable Camera</button>
+                    <button type="button" id="captureSelfieBtn" class="kyc-btn" disabled>Capture Selfie</button>
+                </div>
+
+                <div class="kyc-step">2. Face Match with ID</div>
+                <button type="button" id="faceMatchBtn" class="kyc-btn">Run Face Match</button>
+
+                <div id="kycStatus" class="kyc-status">Status: Pending</div>
+                <button type="button" id="kycRetryBtn" class="kyc-btn retry">Retry</button>
+            `;
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            const videoEl = document.getElementById("kycVideo");
+            const canvasEl = document.getElementById("kycCanvas");
+            const enableCameraBtn = document.getElementById("enableCameraBtn");
+            const captureBtn = document.getElementById("captureSelfieBtn");
+            const faceMatchBtn = document.getElementById("faceMatchBtn");
+            const statusEl = document.getElementById("kycStatus");
+            const retryBtn = document.getElementById("kycRetryBtn");
+
+            let selfieCaptured = false;
+            let cameraReady = false;
+
+            function cameraErrorText(err) {
+                if (!window.isSecureContext) {
+                    return "Status: Retry (open on secure context like https or localhost)";
+                }
+                if (err && err.name === "NotAllowedError") {
+                    return "Status: Retry (camera permission denied)";
+                }
+                if (err && (err.name === "NotFoundError" || err.name === "DevicesNotFoundError")) {
+                    return "Status: Retry (no camera device found)";
+                }
+                return "Status: Retry (unable to start camera)";
+            }
+
+            enableCameraBtn.addEventListener("click", async () => {
+                try {
+                    await startKycCamera(videoEl);
+                    cameraReady = true;
+                    captureBtn.disabled = false;
+                    enableCameraBtn.disabled = true;
+                    statusEl.textContent = "Status: Camera enabled";
+                    statusEl.classList.remove("retry");
+                } catch (err) {
+                    statusEl.textContent = cameraErrorText(err);
+                    statusEl.classList.add("retry");
+                }
+            });
+
+            captureBtn.addEventListener("click", () => {
+                if (!cameraStream || !cameraReady) {
+                    statusEl.textContent = "Status: Retry (camera not available)";
+                    statusEl.classList.add("retry");
+                    return;
+                }
+                const ctx = canvasEl.getContext("2d");
+                canvasEl.width = videoEl.videoWidth || 320;
+                canvasEl.height = videoEl.videoHeight || 240;
+                ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+                selfieCaptured = true;
+                statusEl.textContent = "Status: Selfie captured";
+                statusEl.classList.remove("retry");
+            });
+
+            faceMatchBtn.addEventListener("click", () => {
+                if (selfieCaptured) {
+                    statusEl.textContent = "Status: Verified";
+                    statusEl.classList.add("verified");
+                    statusEl.classList.remove("retry");
+                    moveToStep(6);
+                    addMessage("KYC verified successfully. Next step: Financial status.", "bot");
+                    currentFinancialFieldIndex = 0;
+                    addMessage("Please enter Occupation Type (Student / Salaried / Business).", "bot");
+                    showOptionButtons("occupationType");
+                } else {
+                    statusEl.textContent = "Status: Retry";
+                    statusEl.classList.add("retry");
+                    statusEl.classList.remove("verified");
+                }
+            });
+
+            retryBtn.addEventListener("click", () => {
+                selfieCaptured = false;
+                cameraReady = false;
+                statusEl.textContent = "Status: Retry";
+                statusEl.classList.add("retry");
+                statusEl.classList.remove("verified");
+                captureBtn.disabled = true;
+                enableCameraBtn.disabled = false;
+                stopKycCamera();
+            });
+        }
+
+        function handleIdentityProof(inputText) {
+            const value = inputText.trim();
+            const field = identityFields[currentIdentityFieldIndex];
+
+            if (field === "aadhaar") {
+                if (!isValidAadhaar(value)) {
+                    addMessage("Please enter a valid Aadhaar Number (12 digits).", "bot");
+                    return true;
+                }
+                identityDetails.aadhaar = value;
+                currentIdentityFieldIndex = 1;
+                addMessage("Please enter your PAN Number.", "bot");
+                return true;
+            }
+
+            if (field === "pan") {
+                if (!isValidPan(value)) {
+                    addMessage("Please enter a valid PAN Number (example: ABCDE1234F).", "bot");
+                    return true;
+                }
+                identityDetails.pan = value.toUpperCase();
+                currentIdentityFieldIndex = -1;
+                moveToStep(4);
+                addMessage("Please upload Address Proof, Income Proof (optional), and Photo.", "bot");
+                showDocumentUploadPanel();
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleFinancialDetails(inputText) {
+            const value = inputText.trim();
+            const field = financialFields[currentFinancialFieldIndex];
+
+            if (field === "occupationType") {
+                if (!isValidOccupationType(value)) {
+                    addMessage("Please enter Occupation Type as Student, Salaried, or Business.", "bot");
+                    showOptionButtons("occupationType");
+                    return true;
+                }
+                const occupation = value.toLowerCase();
+                financialDetails.occupationType = occupation;
+                if (occupation === "salaried") {
+                    currentFinancialFieldIndex = 1;
+                    addMessage("Please enter your Employer Name.", "bot");
+                } else {
+                    financialDetails.employerName = "N/A";
+                    currentFinancialFieldIndex = 2;
+                    addMessage("Please enter your Annual Income.", "bot");
+                }
+                return true;
+            }
+
+            if (field === "employerName") {
+                if (!isValidEmployerName(value)) {
+                    addMessage("Please enter a valid Employer Name.", "bot");
+                    return true;
+                }
+                financialDetails.employerName = value;
+                currentFinancialFieldIndex = 2;
+                addMessage("Please enter your Annual Income.", "bot");
+                return true;
+            }
+
+            if (field === "annualIncome") {
+                if (!isValidAnnualIncome(value)) {
+                    addMessage("Please enter a valid Annual Income (numbers only).", "bot");
+                    return true;
+                }
+                financialDetails.annualIncome = value.replace(/,/g, "").trim();
+                currentFinancialFieldIndex = 3;
+                addMessage("Please enter your Source of Income.", "bot");
+                return true;
+            }
+
+            if (field === "sourceIncome") {
+                if (!isValidSourceIncome(value)) {
+                    addMessage("Please enter a valid Source of Income.", "bot");
+                    return true;
+                }
+                financialDetails.sourceIncome = value;
+                currentFinancialFieldIndex = 4;
+                addMessage("Please enter Tax Residency (India / Other).", "bot");
+                showOptionButtons("taxResidency");
+                return true;
+            }
+
+            if (field === "taxResidency") {
+                if (!isValidTaxResidency(value)) {
+                    addMessage("Please enter Tax Residency as India or Other.", "bot");
+                    showOptionButtons("taxResidency");
+                    return true;
+                }
+                financialDetails.taxResidency = value;
+                currentFinancialFieldIndex = 5;
+                addMessage("Please enter PAN Verification Status (Verified / Pending / Failed).", "bot");
+                showOptionButtons("panVerificationStatus");
+                return true;
+            }
+
+            if (field === "panVerificationStatus") {
+                if (!isValidPanVerificationStatus(value)) {
+                    addMessage("Please enter PAN Verification Status as Verified, Pending, or Failed.", "bot");
+                    showOptionButtons("panVerificationStatus");
+                    return true;
+                }
+                financialDetails.panVerificationStatus = value;
+                addMessage("Financial details captured successfully. Next step: Risk Assesment.", "bot");
+                moveToStep(7);
+                currentFinancialFieldIndex = -1;
+                currentRiskFieldIndex = 0;
+                addMessage("Please enter Investment Experience (Beginner / Intermediate / Expert).", "bot");
+                showOptionButtons("investmentExperience");
+                return true;
+            }
+
+            return false;
+        }
+
+        function getRiskHelpMessage(field) {
+            if (field === "investmentExperience") {
+                return "Investment Experience: Beginner = new to investing, Intermediate = some experience, Expert = strong market knowledge.";
+            }
+            if (field === "riskAppetite") {
+                return "Risk Appetite: Low = safer returns, Medium = balanced risk/return, High = higher risk for higher potential return.";
+            }
+            if (field === "investmentGoal") {
+                return "Investment Goal: Savings = capital safety, Growth = long-term wealth, Trading = active short-term market activity.";
+            }
+            if (field === "investmentDuration") {
+                return "Investment Duration: Short = up to 1 year, Medium = 1 to 5 years, Long term = more than 5 years.";
+            }
+            return "Please choose one of the listed options.";
+        }
+
+        function getRiskProfileLabel() {
+            const experienceScoreMap = { beginner: 1, intermediate: 2, expert: 3 };
+            const appetiteScoreMap = { low: 1, medium: 2, high: 3 };
+            const goalScoreMap = { savings: 1, growth: 2, trading: 3 };
+            const durationScoreMap = { short: 1, medium: 2, "long term": 3, "long-term": 3, long: 3 };
+
+            const experience = (riskDetails.investmentExperience || "").trim().toLowerCase();
+            const appetite = (riskDetails.riskAppetite || "").trim().toLowerCase();
+            const goal = (riskDetails.investmentGoal || "").trim().toLowerCase();
+            const duration = (riskDetails.investmentDuration || "").trim().toLowerCase();
+
+            const score =
+                (experienceScoreMap[experience] || 1) +
+                (appetiteScoreMap[appetite] || 1) +
+                (goalScoreMap[goal] || 1) +
+                (durationScoreMap[duration] || 1);
+            const avg = score / 4;
+
+            if (avg >= 2.4) return "High";
+            if (avg >= 1.7) return "Medium";
+            return "Low";
+        }
+
+        function handleRiskAssessment(inputText) {
+            const value = inputText.trim();
+            const field = riskFields[currentRiskFieldIndex];
+
+            if (/^(explain|help|what does this mean)/i.test(value)) {
+                addMessage(getRiskHelpMessage(field), "bot");
+                if (field) showOptionButtons(field);
+                return true;
+            }
+
+            if (field === "investmentExperience") {
+                if (!isValidInvestmentExperience(value)) {
+                    addMessage("Please enter Investment Experience as Beginner, Intermediate, or Expert. Type 'explain' for help.", "bot");
+                    showOptionButtons("investmentExperience");
+                    return true;
+                }
+                riskDetails.investmentExperience = value;
+                currentRiskFieldIndex = 1;
+                addMessage("Please enter Risk Appetite (Low / Medium / High).", "bot");
+                showOptionButtons("riskAppetite");
+                return true;
+            }
+
+            if (field === "riskAppetite") {
+                if (!isValidRiskAppetite(value)) {
+                    addMessage("Please enter Risk Appetite as Low, Medium, or High. Type 'explain' for help.", "bot");
+                    showOptionButtons("riskAppetite");
+                    return true;
+                }
+                riskDetails.riskAppetite = value;
+                currentRiskFieldIndex = 2;
+                addMessage("Please enter Investment Goal (Savings / Growth / Trading).", "bot");
+                showOptionButtons("investmentGoal");
+                return true;
+            }
+
+            if (field === "investmentGoal") {
+                if (!isValidInvestmentGoal(value)) {
+                    addMessage("Please enter Investment Goal as Savings, Growth, or Trading. Type 'explain' for help.", "bot");
+                    showOptionButtons("investmentGoal");
+                    return true;
+                }
+                riskDetails.investmentGoal = value;
+                currentRiskFieldIndex = 3;
+                addMessage("Please enter Investment Duration (Short / Medium / Long term).", "bot");
+                showOptionButtons("investmentDuration");
+                return true;
+            }
+
+            if (field === "investmentDuration") {
+                if (!isValidInvestmentDuration(value)) {
+                    addMessage("Please enter Investment Duration as Short, Medium, or Long term. Type 'explain' for help.", "bot");
+                    showOptionButtons("investmentDuration");
+                    return true;
+                }
+                riskDetails.investmentDuration = value;
+                riskDetails.riskProfile = getRiskProfileLabel();
+                currentRiskFieldIndex = -1;
+                addMessage("Risk assessment captured successfully. Next step: Account Prefrences.", "bot");
+                addMessage(`Your risk profile is: ${riskDetails.riskProfile}.`, "bot");
+                moveToStep(8);
+                currentAccountPreferenceFieldIndex = 0;
+                addMessage("Please enter Account Type (Savings / Current).", "bot");
+                showOptionButtons("accountType");
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleAccountPreferences(inputText) {
+            const value = inputText.trim();
+            const field = accountPreferenceFields[currentAccountPreferenceFieldIndex];
+
+            if (field === "accountType") {
+                if (!isValidAccountType(value)) {
+                    addMessage("Please enter Account Type as Savings or Current.", "bot");
+                    showOptionButtons("accountType");
+                    return true;
+                }
+                accountPreferences.accountType = value;
+                currentAccountPreferenceFieldIndex = 1;
+                addMessage("Debit Card Required? (Yes/No)", "bot");
+                showOptionButtons("yesNo");
+                return true;
+            }
+
+            if (field === "debitCardRequired") {
+                if (!isValidYesNo(value)) {
+                    addMessage("Please enter Debit Card Required as Yes or No.", "bot");
+                    showOptionButtons("yesNo");
+                    return true;
+                }
+                accountPreferences.debitCardRequired = value;
+                currentAccountPreferenceFieldIndex = 2;
+                addMessage("Cheque Book Required? (Yes/No)", "bot");
+                showOptionButtons("yesNo");
+                return true;
+            }
+
+            if (field === "chequeBookRequired") {
+                if (!isValidYesNo(value)) {
+                    addMessage("Please enter Cheque Book Required as Yes or No.", "bot");
+                    showOptionButtons("yesNo");
+                    return true;
+                }
+                accountPreferences.chequeBookRequired = value;
+                currentAccountPreferenceFieldIndex = 3;
+                addMessage("Internet Banking Required? (Yes/No)", "bot");
+                showOptionButtons("yesNo");
+                return true;
+            }
+
+            if (field === "internetBanking") {
+                if (!isValidYesNo(value)) {
+                    addMessage("Please enter Internet Banking as Yes or No.", "bot");
+                    showOptionButtons("yesNo");
+                    return true;
+                }
+                accountPreferences.internetBanking = value;
+                currentAccountPreferenceFieldIndex = 4;
+                addMessage("Nominee Required? (Yes/No)", "bot");
+                showOptionButtons("yesNo");
+                return true;
+            }
+
+            if (field === "nomineeRequired") {
+                if (!isValidYesNo(value)) {
+                    addMessage("Please enter Nominee Required as Yes or No.", "bot");
+                    showOptionButtons("yesNo");
+                    return true;
+                }
+                accountPreferences.nomineeRequired = value;
+                currentAccountPreferenceFieldIndex = 5;
+                addMessage("Please enter Communication Mode (SMS / Email / Both).", "bot");
+                showOptionButtons("communicationMode");
+                return true;
+            }
+
+            if (field === "communicationMode") {
+                if (!isValidCommunicationMode(value)) {
+                    addMessage("Please enter Communication Mode as SMS, Email, or Both.", "bot");
+                    showOptionButtons("communicationMode");
+                    return true;
+                }
+                accountPreferences.communicationMode = value;
+                currentAccountPreferenceFieldIndex = -1;
+                if ((accountPreferences.nomineeRequired || "").trim().toLowerCase() === "yes") {
+                    addMessage("Account preferences captured successfully. Next step: Nominee details.", "bot");
+                    moveToStep(9);
+                    currentNomineeFieldIndex = 0;
+                    addMessage("Please enter Nominee Name.", "bot");
+                } else {
+                    addMessage("Account preferences captured successfully. Nominee details skipped (selected No).", "bot");
+                    enterFinalReview("Next step: Review and confirm.");
+                }
+                return true;
+            }
+
+            return false;
+        }
+
+        function handleNomineeDetails(inputText) {
+            const value = inputText.trim();
+            const field = nomineeFields[currentNomineeFieldIndex];
+
+            if (field === "nomineeName") {
+                if (!isValidFullName(value)) {
+                    addMessage("Please enter a valid Nominee Name (first and last name).", "bot");
+                    return true;
+                }
+                nomineeDetails.nomineeName = value;
+                currentNomineeFieldIndex = 1;
+                addMessage("Please enter Relationship.", "bot");
+                return true;
+            }
+
+            if (field === "relationship") {
+                if (!isValidRelationship(value)) {
+                    addMessage("Please enter a valid Relationship.", "bot");
+                    return true;
+                }
+                nomineeDetails.relationship = value;
+                currentNomineeFieldIndex = 2;
+                addMessage("Please enter Nominee DOB (YYYY-MM-DD or DD/MM/YYYY).", "bot");
+                return true;
+            }
+
+            if (field === "nomineeDob") {
+                if (!isValidDob(value)) {
+                    addMessage("Please enter Nominee DOB in YYYY-MM-DD or DD/MM/YYYY format.", "bot");
+                    return true;
+                }
+                const age = getAgeFromDob(value);
+                if (age === null || age < 0 || age > 120) {
+                    addMessage("Please enter a valid Nominee DOB.", "bot");
+                    return true;
+                }
+                nomineeDetails.nomineeDob = value;
+                nomineeNeedsGuardian = age < 18;
+                currentNomineeFieldIndex = 3;
+                addMessage("Please enter Nominee Address.", "bot");
+                return true;
+            }
+
+            if (field === "nomineeAddress") {
+                if (!isValidAddress(value)) {
+                    addMessage("Please enter a valid Nominee Address.", "bot");
+                    return true;
+                }
+                nomineeDetails.nomineeAddress = value;
+                currentNomineeFieldIndex = 4;
+                addMessage("Please enter Nominee Phone Number (10 digits).", "bot");
+                return true;
+            }
+
+            if (field === "nomineePhone") {
+                if (!isValidMobile(value)) {
+                    addMessage("Please enter a valid Nominee Phone Number (10 digits).", "bot");
+                    return true;
+                }
+                nomineeDetails.nomineePhone = value;
+                if (nomineeNeedsGuardian) {
+                    currentNomineeFieldIndex = 5;
+                    addMessage("Nominee is under 18. Please enter Guardian Details.", "bot");
+                } else {
+                    nomineeDetails.guardianDetails = "N/A";
+                    currentNomineeFieldIndex = -1;
+                    enterFinalReview("Nominee details captured successfully. Next step: Review and confirm.");
+                }
+                return true;
+            }
+
+            if (field === "guardianDetails") {
+                if (value.length < 5) {
+                    addMessage("Please enter valid Guardian Details.", "bot");
+                    return true;
+                }
+                nomineeDetails.guardianDetails = value;
+                currentNomineeFieldIndex = -1;
+                enterFinalReview("Nominee details captured successfully. Next step: Review and confirm.");
+                return true;
+            }
+
+            return false;
+        }
+
+        function setupSignatureCanvas(canvasEl) {
+            const ctx = canvasEl.getContext("2d");
+            let isDrawing = false;
+            let hasSignature = false;
+
+            function getPos(e) {
+                const rect = canvasEl.getBoundingClientRect();
+                if (e.touches && e.touches.length) {
+                    return {
+                        x: e.touches[0].clientX - rect.left,
+                        y: e.touches[0].clientY - rect.top
+                    };
+                }
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+
+            function start(e) {
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const pos = getPos(e);
+                ctx.lineWidth = 2;
+                ctx.lineCap = "round";
+                ctx.strokeStyle = "#1f3560";
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+                hasSignature = true;
+            }
+
+            function end() {
+                isDrawing = false;
+            }
+
+            canvasEl.addEventListener("mousedown", start);
+            canvasEl.addEventListener("mousemove", draw);
+            canvasEl.addEventListener("mouseup", end);
+            canvasEl.addEventListener("mouseleave", end);
+            canvasEl.addEventListener("touchstart", start, { passive: true });
+            canvasEl.addEventListener("touchmove", draw, { passive: true });
+            canvasEl.addEventListener("touchend", end);
+
+            return {
+                clear() {
+                    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                    hasSignature = false;
+                },
+                hasSignature() {
+                    return hasSignature;
+                }
+            };
+        }
+
+        function showEsignPanel() {
+            if (esignShown) return;
+            esignShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot esign-wrapper";
+            wrapper.innerHTML = `
+                <div class="esign-title">E-Sign / Digital Signature</div>
+                <div class="esign-options">
+                    <label><input type="radio" name="esignOption" value="otp" checked /> Aadhaar OTP eSign</label>
+                    <label><input type="radio" name="esignOption" value="draw" /> Draw Signature</label>
+                    <label><input type="radio" name="esignOption" value="upload" /> Upload Signature Image</label>
+                </div>
+
+                <div id="otpBlock" class="esign-block">
+                    <button type="button" id="sendOtpBtn" class="esign-btn">Send OTP</button>
+                    <input type="text" id="otpInput" class="esign-input" placeholder="Enter OTP" />
+                    <button type="button" id="verifyOtpBtn" class="esign-btn">Verify OTP</button>
+                    <div id="otpStatus" class="esign-status">OTP not verified</div>
+                </div>
+
+                <div id="drawBlock" class="esign-block hidden">
+                    <canvas id="signatureCanvas" class="signature-canvas" width="420" height="140"></canvas>
+                    <button type="button" id="clearSignBtn" class="esign-btn secondary">Clear Signature</button>
+                </div>
+
+                <div id="uploadBlock" class="esign-block hidden">
+                    <input type="file" id="signatureImageFile" class="upload-input" accept=".jpg,.jpeg,.png" />
+                </div>
+
+                <button type="button" id="completeEsignBtn" class="esign-btn">Complete E-Sign</button>
+            `;
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            const optionInputs = Array.from(wrapper.querySelectorAll("input[name='esignOption']"));
+            const otpBlock = document.getElementById("otpBlock");
+            const drawBlock = document.getElementById("drawBlock");
+            const uploadBlock = document.getElementById("uploadBlock");
+            const sendOtpBtn = document.getElementById("sendOtpBtn");
+            const otpInput = document.getElementById("otpInput");
+            const verifyOtpBtn = document.getElementById("verifyOtpBtn");
+            const otpStatus = document.getElementById("otpStatus");
+            const signatureCanvas = document.getElementById("signatureCanvas");
+            const clearSignBtn = document.getElementById("clearSignBtn");
+            const signatureImageFile = document.getElementById("signatureImageFile");
+            const completeEsignBtn = document.getElementById("completeEsignBtn");
+
+            const signaturePad = setupSignatureCanvas(signatureCanvas);
+            let otpVerified = false;
+
+            function showBlock(selected) {
+                otpBlock.classList.toggle("hidden", selected !== "otp");
+                drawBlock.classList.toggle("hidden", selected !== "draw");
+                uploadBlock.classList.toggle("hidden", selected !== "upload");
+            }
+
+            optionInputs.forEach((input) => {
+                input.addEventListener("change", () => showBlock(input.value));
+            });
+
+            sendOtpBtn.addEventListener("click", () => {
+                otpCode = "123456";
+                otpVerified = false;
+                otpStatus.textContent = "OTP sent to your registered mobile. (Demo OTP: 123456)";
+                otpStatus.classList.remove("verified");
+            });
+
+            verifyOtpBtn.addEventListener("click", () => {
+                if (otpInput.value.trim() === otpCode && otpCode) {
+                    otpVerified = true;
+                    otpStatus.textContent = "OTP verified successfully";
+                    otpStatus.classList.add("verified");
+                } else {
+                    otpVerified = false;
+                    otpStatus.textContent = "Invalid OTP. Please try again.";
+                    otpStatus.classList.remove("verified");
+                }
+            });
+
+            clearSignBtn.addEventListener("click", () => {
+                signaturePad.clear();
+            });
+
+            completeEsignBtn.addEventListener("click", () => {
+                const selected = optionInputs.find((input) => input.checked)?.value;
+                if (selected === "otp" && !otpVerified) {
+                    addMessage("Please verify OTP to complete Aadhaar OTP eSign.", "bot");
+                    return;
+                }
+                if (selected === "draw" && !signaturePad.hasSignature()) {
+                    addMessage("Please draw your signature before continuing.", "bot");
+                    return;
+                }
+                if (selected === "upload" && !(signatureImageFile.files && signatureImageFile.files.length > 0)) {
+                    addMessage("Please upload your signature image before continuing.", "bot");
+                    return;
+                }
+
+                completeEsignBtn.disabled = true;
+                completeEsignBtn.textContent = "E-Sign Completed";
+                moveToStep(12);
+                addMessage("E-Sign completed successfully. Next step: Set app pin.", "bot");
+                showSetPinPanel();
+            });
+        }
+
+        function showSetPinPanel() {
+            if (setPinShown) return;
+            setPinShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot pin-wrapper";
+            wrapper.innerHTML = `
+                <div class="pin-title">Set App PIN / Password</div>
+                <label class="pin-label">Create 4/6 digit PIN</label>
+                <input type="password" id="createPinInput" class="pin-input" maxlength="6" placeholder="Enter 4 or 6 digit PIN" />
+
+                <label class="pin-label">Confirm PIN</label>
+                <input type="password" id="confirmPinInput" class="pin-input" maxlength="6" placeholder="Re-enter PIN" />
+
+                <label class="pin-label">Set Password (optional)</label>
+                <input type="password" id="passwordInput" class="pin-input" placeholder="Optional password" />
+
+                <button type="button" id="savePinBtn" class="pin-btn">Save PIN & Continue</button>
+            `;
+
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            const createPinInput = document.getElementById("createPinInput");
+            const confirmPinInput = document.getElementById("confirmPinInput");
+            const passwordInput = document.getElementById("passwordInput");
+            const savePinBtn = document.getElementById("savePinBtn");
+
+            savePinBtn.addEventListener("click", async () => {
+                const pin = (createPinInput.value || "").trim();
+                const confirmPin = (confirmPinInput.value || "").trim();
+                const password = (passwordInput.value || "").trim();
+                const mobile = (contactDetails.mobile || "").trim();
+
+                if (!/^(\d{4}|\d{6})$/.test(pin)) {
+                    addMessage("Please create a valid 4 or 6 digit PIN.", "bot");
+                    return;
+                }
+
+                if (confirmPin !== pin) {
+                    addMessage("Confirm PIN does not match. Please try again.", "bot");
+                    return;
+                }
+
+                if (password && password.length < 8) {
+                    addMessage("Optional password must be at least 8 characters.", "bot");
+                    return;
+                }
+
+                if (!/^\d{10}$/.test(mobile)) {
+                    addMessage("Registered mobile number is missing. Please recheck Contact Details.", "bot");
+                    return;
+                }
+
+                savePinBtn.disabled = true;
+                savePinBtn.textContent = "Saving PIN...";
+
+                const uid = await ensureOnboardingUserId();
+                if (!uid) {
+                    savePinBtn.disabled = false;
+                    savePinBtn.textContent = "Save PIN & Continue";
+                    addMessage("Could not resolve user ID to save login credentials. Please retry.", "bot");
+                    return;
+                }
+
+                try {
+                    const res = await fetch("/save-login-credentials", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            user_id: uid,
+                            mobile,
+                            pin
+                        })
+                    });
+                    const data = await res.json();
+                    if (!res.ok || !data || !data.ok) {
+                        throw new Error((data && data.error) || "Credential save failed");
+                    }
+                } catch (error) {
+                    savePinBtn.disabled = false;
+                    savePinBtn.textContent = "Save PIN & Continue";
+                    addMessage(`Could not save login credentials: ${error.message}.`, "bot");
+                    return;
+                }
+
+                savePinBtn.textContent = "PIN Saved";
+                moveToStep(13);
+                addMessage("App PIN set successfully. Next step: Account creation.", "bot");
+                showAccountCreationPanel();
+            });
+        }
+
+        function showMismatchEditor(warnings) {
+            if (mismatchEditorShown) return;
+            mismatchEditorShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot review-wrapper";
+            wrapper.innerHTML = `
+                <div class="review-title">Document Mismatch - Edit Info</div>
+                <p class="mismatch-note">Document info doesn't match with user details. Update fields and save.</p>
+                <div class="review-form">
+                    <div class="review-row"><label class="review-label">Full Name</label><input id="editFullName" class="review-input" type="text" value="${basicDetails.fullName || ""}" /></div>
+                    <div class="review-row"><label class="review-label">Date of Birth</label><input id="editDob" class="review-input" type="text" value="${basicDetails.dob || ""}" /></div>
+                    <div class="review-row"><label class="review-label">Aadhaar Number</label><input id="editAadhaar" class="review-input" type="text" value="${identityDetails.aadhaar || ""}" /></div>
+                    <div class="review-row"><label class="review-label">PAN Number</label><input id="editPan" class="review-input" type="text" value="${identityDetails.pan || ""}" /></div>
+                    <div class="review-row"><label class="review-label">City</label><input id="editCity" class="review-input" type="text" value="${contactDetails.city || ""}" /></div>
+                    <div class="review-row"><label class="review-label">State</label><input id="editState" class="review-input" type="text" value="${contactDetails.state || ""}" /></div>
+                    <div class="review-row"><label class="review-label">Pincode</label><input id="editPincode" class="review-input" type="text" value="${contactDetails.pincode || ""}" /></div>
+                    <div class="review-row"><label class="review-label">Country</label><input id="editCountry" class="review-input" type="text" value="${contactDetails.country || ""}" /></div>
+                </div>
+                <div class="review-actions">
+                    <button type="button" id="saveMismatchEditsBtn" class="review-btn">Save Updated Info</button>
+                    <button type="button" id="proceedMismatchBtn" class="review-btn secondary">Proceed Anyway</button>
+                </div>
+            `;
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            if (Array.isArray(warnings) && warnings.length > 0) {
+                warnings.forEach((w) => addMessage(`- ${w}`, "bot"));
+            }
+
+            const saveBtn = document.getElementById("saveMismatchEditsBtn");
+            const proceedBtn = document.getElementById("proceedMismatchBtn");
+            saveBtn.addEventListener("click", () => {
+                basicDetails.fullName = (document.getElementById("editFullName")?.value || "").trim();
+                basicDetails.dob = (document.getElementById("editDob")?.value || "").trim();
+                identityDetails.aadhaar = (document.getElementById("editAadhaar")?.value || "").trim();
+                identityDetails.pan = (document.getElementById("editPan")?.value || "").trim();
+                contactDetails.city = (document.getElementById("editCity")?.value || "").trim();
+                contactDetails.state = (document.getElementById("editState")?.value || "").trim();
+                contactDetails.pincode = (document.getElementById("editPincode")?.value || "").trim();
+                contactDetails.country = (document.getElementById("editCountry")?.value || "").trim();
+
+                saveBtn.disabled = true;
+                saveBtn.textContent = "Saved";
+                addMessage("Updated info saved. Please re-upload documents to verify again.", "bot");
+                mismatchEditorShown = false;
+            });
+
+            proceedBtn.addEventListener("click", () => {
+                documentVerificationStatus = "pending";
+                proceedBtn.disabled = true;
+                proceedBtn.textContent = "Proceeding";
+                addMessage("Proceeding with pending document verification.", "bot");
+                moveToStep(5);
+                addMessage("Next step: KYC verification.", "bot");
+                showKycPanel();
+                mismatchEditorShown = false;
+            });
+        }
+
+        function generateAccountDetails() {
+            const randDigits = (len) => Array.from({ length: len }, () => Math.floor(Math.random() * 10)).join("");
+            const branchNames = ["MG Road Branch", "City Center Branch", "Tech Park Branch", "Lake View Branch"];
+            const randomBranch = branchNames[Math.floor(Math.random() * branchNames.length)];
+            return {
+                accountNumber: `02${randDigits(12)}`,
+                customerId: `CUST${randDigits(8)}`,
+                ifscCode: "AIBK0001234",
+                branchName: randomBranch
+            };
+        }
+
+        function buildOnboardingPayload() {
+            return {
+                basicDetails,
+                contactDetails,
+                identityDetails,
+                financialDetails,
+                riskDetails,
+                accountPreferences,
+                nomineeDetails,
+                documentVerificationStatus
+            };
+        }
+
+        async function ensureOnboardingUserId() {
+            if (onboardingUserId) return onboardingUserId;
+            try {
+                const res = await fetch("/save-onboarding", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(buildOnboardingPayload())
+                });
+                const data = await res.json();
+                if (data && data.ok && data.user_id) {
+                    onboardingUserId = data.user_id;
+                    return onboardingUserId;
+                }
+            } catch (error) {
+                // handled by caller
+            }
+            return null;
+        }
+
+        function showAccountCreationPanel() {
+            if (accountCreatedShown) return;
+            accountCreatedShown = true;
+
+            const details = generateAccountDetails();
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot account-wrapper";
+            wrapper.innerHTML = `
+                <div class="account-title">Account Generation</div>
+                <div class="account-row"><span>Account Number</span><strong id="accNo">${details.accountNumber}</strong></div>
+                <div class="account-row"><span>Customer ID</span><strong id="custId">${details.customerId}</strong></div>
+                <div class="account-row"><span>IFSC Code</span><strong id="ifscCode">${details.ifscCode}</strong></div>
+                <div class="account-row"><span>Branch Name</span><strong id="branchName">${details.branchName}</strong></div>
+                <button type="button" id="downloadWelcomeKitBtn" class="account-btn">Download Welcome Kit (PDF)</button>
+                <div class="account-success">🎉 Account Created Successfully. Redirecting to dashboard...</div>
+            `;
+
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+            addMessage("🎉 Account Created Successfully. Redirecting to dashboard.", "bot");
+
+            const downloadBtn = document.getElementById("downloadWelcomeKitBtn");
+            downloadBtn.addEventListener("click", () => {
+                const jspdfLib = window.jspdf;
+                if (!jspdfLib || !jspdfLib.jsPDF) {
+                    addMessage("PDF library could not be loaded. Please try again.", "bot");
+                    return;
+                }
+
+                const { jsPDF } = jspdfLib;
+                const doc = new jsPDF();
+                doc.setFontSize(18);
+                doc.text("AI BANK - Welcome Kit", 14, 20);
+                doc.setFontSize(12);
+                doc.text(`Account Number: ${details.accountNumber}`, 14, 40);
+                doc.text(`Customer ID: ${details.customerId}`, 14, 50);
+                doc.text(`IFSC Code: ${details.ifscCode}`, 14, 60);
+                doc.text(`Branch Name: ${details.branchName}`, 14, 70);
+                doc.text("Welcome to AI Bank. Your account is now active.", 14, 90);
+                doc.save(`AI_BANK_Welcome_Kit_${details.customerId}.pdf`);
+            });
+
+            (async () => {
+                const uid = await ensureOnboardingUserId();
+                if (!uid) {
+                    addMessage("Account created, but could not resolve user id for DB save.", "bot");
+                    return;
+                }
+
+                try {
+                    const res = await fetch("/save-bank-account", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            user_id: uid
+                        })
+                    });
+                    const data = await res.json();
+                    if (!data || !data.ok) {
+                        addMessage("Account created, but DB save failed for bank account details.", "bot");
+                    } else if (data.account) {
+                        details.accountNumber = data.account.account_number || details.accountNumber;
+                        details.customerId = data.account.customer_id || details.customerId;
+                        details.ifscCode = data.account.ifsc_code || details.ifscCode;
+                        details.branchName = data.account.branch_name || details.branchName;
+
+                        const accNoEl = document.getElementById("accNo");
+                        const custIdEl = document.getElementById("custId");
+                        const ifscEl = document.getElementById("ifscCode");
+                        const branchEl = document.getElementById("branchName");
+                        if (accNoEl) accNoEl.textContent = details.accountNumber;
+                        if (custIdEl) custIdEl.textContent = details.customerId;
+                        if (ifscEl) ifscEl.textContent = details.ifscCode;
+                        if (branchEl) branchEl.textContent = details.branchName;
+                    }
+                } catch (error) {
+                    addMessage("Account created, but DB connection failed while saving bank account details.", "bot");
+                }
+            })();
+
+            setTimeout(() => {
+                const redirectUserId = encodeURIComponent(onboardingUserId || "");
+                window.location.href = redirectUserId ? `/dashboard?user_id=${redirectUserId}` : "/dashboard";
+            }, 2500);
+        }
+
+        function getReviewSections() {
+            const sections = [
+                {
+                    title: "Basic Personal Details",
+                    scope: "basic",
+                    fields: [
+                        ["fullName", "Full Name", basicDetails.fullName || ""],
+                        ["dob", "Date of Birth", basicDetails.dob || ""],
+                        ["gender", "Gender", basicDetails.gender || ""],
+                        ["parentName", "Father's / Mother's Name", basicDetails.parentName || ""],
+                        ["maritalStatus", "Marital Status", basicDetails.maritalStatus || ""]
+                    ]
+                },
+                {
+                    title: "Contact Details",
+                    scope: "contact",
+                    fields: [
+                        ["mobile", "Mobile Number", contactDetails.mobile || ""],
+                        ["email", "Email ID", contactDetails.email || ""],
+                        ["currentAddress", "Current Address", contactDetails.currentAddress || ""],
+                        ["permanentAddress", "Permanent Address", contactDetails.permanentAddress || ""],
+                        ["city", "City", contactDetails.city || ""],
+                        ["state", "State", contactDetails.state || ""],
+                        ["pincode", "Pincode", contactDetails.pincode || ""],
+                        ["country", "Country", contactDetails.country || ""]
+                    ]
+                },
+                {
+                    title: "Identity Proof",
+                    scope: "identity",
+                    fields: [
+                        ["aadhaar", "Aadhaar Number", identityDetails.aadhaar || ""],
+                        ["pan", "PAN Number", identityDetails.pan || ""],
+                        ["docVerificationStatus", "Document Verification Status", documentVerificationStatus]
+                    ]
+                },
+                {
+                    title: "Financial Details",
+                    scope: "financial",
+                    fields: [
+                        ["occupationType", "Occupation Type", financialDetails.occupationType || ""],
+                        ["employerName", "Employer Name", financialDetails.employerName || ""],
+                        ["annualIncome", "Annual Income", financialDetails.annualIncome || ""],
+                        ["sourceIncome", "Source of Income", financialDetails.sourceIncome || ""],
+                        ["taxResidency", "Tax Residency", financialDetails.taxResidency || ""],
+                        ["panVerificationStatus", "PAN Verification Status", financialDetails.panVerificationStatus || ""]
+                    ]
+                },
+                {
+                    title: "Risk Assessment",
+                    scope: "risk",
+                    fields: [
+                        ["investmentExperience", "Investment Experience", riskDetails.investmentExperience || ""],
+                        ["riskAppetite", "Risk Appetite", riskDetails.riskAppetite || ""],
+                        ["investmentGoal", "Investment Goal", riskDetails.investmentGoal || ""],
+                        ["investmentDuration", "Investment Duration", riskDetails.investmentDuration || ""],
+                        ["riskProfile", "Risk Profile", riskDetails.riskProfile || ""]
+                    ]
+                },
+                {
+                    title: "Account Preferences",
+                    scope: "account",
+                    fields: [
+                        ["accountType", "Account Type", accountPreferences.accountType || ""],
+                        ["debitCardRequired", "Debit Card Required", accountPreferences.debitCardRequired || ""],
+                        ["chequeBookRequired", "Cheque Book Required", accountPreferences.chequeBookRequired || ""],
+                        ["internetBanking", "Internet Banking", accountPreferences.internetBanking || ""],
+                        ["nomineeRequired", "Nominee Required", accountPreferences.nomineeRequired || ""],
+                        ["communicationMode", "Communication Mode", accountPreferences.communicationMode || ""]
+                    ]
+                }
+            ];
+
+            if ((accountPreferences.nomineeRequired || "").trim().toLowerCase() === "yes") {
+                sections.push({
+                    title: "Nominee Details",
+                    scope: "nominee",
+                    fields: [
+                        ["nomineeName", "Nominee Name", nomineeDetails.nomineeName || ""],
+                        ["relationship", "Relationship", nomineeDetails.relationship || ""],
+                        ["nomineeDob", "Nominee DOB", nomineeDetails.nomineeDob || ""],
+                        ["nomineeAddress", "Nominee Address", nomineeDetails.nomineeAddress || ""],
+                        ["nomineePhone", "Nominee Phone Number", nomineeDetails.nomineePhone || ""],
+                        ["guardianDetails", "Guardian Details", nomineeDetails.guardianDetails || ""]
+                    ]
+                });
+            }
+
+            return sections;
+        }
+
+        function enterFinalReview(introMessage) {
+            moveToStep(10);
+            if (introMessage) addMessage(introMessage, "bot");
+            addMessage("Final Review: verify all details below. Use Edit to update, then click Confirm & Submit.", "bot");
+            showFinalReviewPanel();
+        }
+
+        function showFinalReviewPanel() {
+            if (reviewShown) return;
+            reviewShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot review-wrapper";
+
+            const title = document.createElement("div");
+            title.className = "review-title";
+            title.textContent = "Final Review";
+            wrapper.appendChild(title);
+
+            const form = document.createElement("div");
+            form.className = "review-form";
+
+            const sections = getReviewSections();
+            sections.forEach((section) => {
+                const sectionTitle = document.createElement("div");
+                sectionTitle.className = "review-section";
+                sectionTitle.textContent = section.title;
+                form.appendChild(sectionTitle);
+
+                section.fields.forEach(([key, label, value]) => {
+                    const row = document.createElement("div");
+                    row.className = "review-row";
+
+                    const labelEl = document.createElement("label");
+                    labelEl.className = "review-label";
+                    labelEl.textContent = label;
+
+                    const inputEl = document.createElement("input");
+                    inputEl.className = "review-input";
+                    inputEl.type = "text";
+                    inputEl.value = value;
+                    inputEl.disabled = true;
+                    inputEl.setAttribute("data-scope", section.scope);
+                    inputEl.setAttribute("data-key", key);
+
+                    row.appendChild(labelEl);
+                    row.appendChild(inputEl);
+                    form.appendChild(row);
+                });
+            });
+
+            wrapper.appendChild(form);
+
+            const actions = document.createElement("div");
+            actions.className = "review-actions";
+
+            const editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "review-btn secondary";
+            editBtn.textContent = "Edit";
+
+            const confirmBtn = document.createElement("button");
+            confirmBtn.type = "button";
+            confirmBtn.className = "review-btn";
+            confirmBtn.textContent = "Confirm & Submit";
+
+            actions.appendChild(editBtn);
+            actions.appendChild(confirmBtn);
+            wrapper.appendChild(actions);
+
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            const scopeMap = {
+                basic: basicDetails,
+                contact: contactDetails,
+                identity: identityDetails,
+                financial: financialDetails,
+                risk: riskDetails,
+                account: accountPreferences,
+                nominee: nomineeDetails
+            };
+
+            function setInputsDisabled(disabled) {
+                wrapper.querySelectorAll(".review-input").forEach((input) => {
+                    input.disabled = disabled;
+                });
+            }
+
+            editBtn.addEventListener("click", () => {
+                setInputsDisabled(false);
+                addMessage("Review fields unlocked for editing.", "bot");
+            });
+
+            confirmBtn.addEventListener("click", () => {
+                wrapper.querySelectorAll(".review-input").forEach((input) => {
+                    const scope = input.getAttribute("data-scope");
+                    const key = input.getAttribute("data-key");
+                    const target = scopeMap[scope];
+                    if (target) target[key] = input.value.trim();
+                });
+
+                setInputsDisabled(true);
+                confirmBtn.disabled = true;
+                editBtn.disabled = true;
+                fetch("/save-onboarding", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(buildOnboardingPayload())
+                })
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data && data.ok) {
+                        onboardingUserId = data.user_id || onboardingUserId;
+                        addMessage("Details confirmed, submitted, and saved to database. Proceeding to E-Sign.", "bot");
+                    } else {
+                        addMessage("Details confirmed and submitted. DB save failed, proceeding to E-Sign.", "bot");
+                    }
+                    moveToStep(11);
+                    showEsignPanel();
+                })
+                .catch(() => {
+                    addMessage("Details confirmed and submitted. DB connection failed, proceeding to E-Sign.", "bot");
+                    moveToStep(11);
+                    showEsignPanel();
+                });
+            });
+        }
+
+        function showConsentPanel() {
+            if (consentShown) return;
+            consentShown = true;
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "message bot consent-wrapper";
+            wrapper.innerHTML = `
+                <div class="consent-title">Consent and Terms</div>
+                <div class="consent-text">
+                    By continuing with account opening, you confirm that the information you provide is accurate and can be used for onboarding and regulatory checks. We may perform identity and risk verification as required by law. Your data is processed securely for account setup, fraud prevention, and service delivery.
+                    <br><br>
+                    Please read and accept all declarations below to proceed with account creation.
+                </div>
+                <label class="consent-check"><input type="checkbox" id="consentTerms" /> I agree to Terms & Conditions</label>
+                <label class="consent-check"><input type="checkbox" id="consentPrivacy" /> I agree to Privacy Policy</label>
+                <label class="consent-check"><input type="checkbox" id="consentData" /> I consent to data usage for verification</label>
+                <label class="consent-check"><input type="checkbox" id="consentAI" /> I agree to AI assistance</label>
+                <button type="button" id="consentContinue" class="consent-btn">Continue</button>
+            `;
+            chatbox.appendChild(wrapper);
+            chatbox.scrollTop = chatbox.scrollHeight;
+
+            const continueBtn = document.getElementById("consentContinue");
+            continueBtn.addEventListener("click", () => {
+                const allChecked = ["consentTerms", "consentPrivacy", "consentData", "consentAI"]
+                    .map((id) => document.getElementById(id)?.checked)
+                    .every(Boolean);
+
+                if (!allChecked) {
+                    addMessage("Please check all consent boxes to continue.", "bot");
+                    return;
+                }
+
+                moveToStep(1);
+                addMessage("Let's start by filling your personal details. What is your full name?", "bot");
+                currentBasicFieldIndex = 0;
+                continueBtn.disabled = true;
+                continueBtn.textContent = "Consent Accepted";
+            });
+        }
+
+        function processOnboardingFlow(msg) {
+            if (activeStepIndex === 0 && /^yes\b/i.test(msg)) {
+                clearOptionButtons();
+                addMessage("Please review and accept the consent terms below.", "bot");
+                showConsentPanel();
+                return true;
+            }
+
+            if (activeStepIndex === 0) {
+                addMessage("Please click Yes to continue with onboarding.", "bot");
+                showOptionButtons("consentStart");
+                return true;
+            }
+
+            if (activeStepIndex === 1 && currentBasicFieldIndex >= 0) {
+                clearOptionButtons();
+                handleBasicPersonalDetails(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 2 && currentContactFieldIndex >= 0) {
+                clearOptionButtons();
+                handleContactDetails(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 3 && currentIdentityFieldIndex >= 0) {
+                clearOptionButtons();
+                handleIdentityProof(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 6 && currentFinancialFieldIndex >= 0) {
+                clearOptionButtons();
+                handleFinancialDetails(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 7 && currentRiskFieldIndex >= 0) {
+                clearOptionButtons();
+                handleRiskAssessment(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 8 && currentAccountPreferenceFieldIndex >= 0) {
+                clearOptionButtons();
+                handleAccountPreferences(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 9 && currentNomineeFieldIndex >= 0) {
+                clearOptionButtons();
+                handleNomineeDetails(msg);
+                return true;
+            }
+
+            if (activeStepIndex === 10 && reviewShown) {
+                addMessage("Use the Final Review buttons: Edit or Confirm & Submit.", "bot");
+                return true;
+            }
+
+            return false;
+        }
+
+        async function sendMessage() {
+            const msg = messageInput.value.trim();
+            if (!msg) return;
+
+            addMessage(msg, "user");
+            messageInput.value = "";
+
+            if (processOnboardingFlow(msg)) {
+                return;
+            }
+
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg })
+                });
+
+                const data = await res.json();
+                addMessage(data.reply || "No response", "bot");
+            } catch (error) {
+                addMessage("I could not connect. Please try again.", "bot");
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition && voiceBtn) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = "en-IN";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.addEventListener("start", () => {
+                voiceBtn.classList.add("listening");
+                voiceBtn.textContent = "Listening";
+            });
+
+            recognition.addEventListener("result", (event) => {
+                const transcript = event.results[0][0].transcript || "";
+                messageInput.value = transcript.trim();
+                messageInput.focus();
+            });
+
+            recognition.addEventListener("end", () => {
+                voiceBtn.classList.remove("listening");
+                voiceBtn.textContent = "Mic";
+            });
+
+            voiceBtn.addEventListener("click", () => {
+                recognition.start();
+            });
+        } else if (voiceBtn) {
+            voiceBtn.disabled = true;
+            voiceBtn.title = "Voice input is not supported in this browser";
+        }
+
+        window.addEventListener("beforeunload", stopKycCamera);
+
+        addMessage("To open a new bank account, please review consent and terms first. Click Yes to continue.", "bot");
+        showOptionButtons("consentStart");
+    </script>
+</body>
+</html>

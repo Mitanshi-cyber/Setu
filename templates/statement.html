@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bank - Statement</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/statement.css') }}" />
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <main class="statement-page">
+        <header class="statement-head">
+            <div>
+                <h1>Account Statement</h1>
+                <p>{{ user_name }}{% if account_number %} | A/C {{ account_number }}{% endif %}</p>
+            </div>
+            <div class="head-actions">
+                <button id="downloadPdfBtn" class="download-btn" type="button">Download PDF</button>
+                <a class="back-link" href="{{ '/dashboard?user_id=' + user_id if user_id else '/dashboard' }}">Back to Dashboard</a>
+            </div>
+        </header>
+
+        <section class="statement-card">
+            <div class="table-head">
+                <span>Date</span>
+                <span>Reference</span>
+                <span>Beneficiary</span>
+                <span>Status</span>
+                <span class="amount-col">Amount</span>
+            </div>
+
+            {% if transactions and transactions|length > 0 %}
+                {% for txn in transactions %}
+                <div class="table-row">
+                    <span>{{ txn.created_at_display or txn.created_at or "-" }}</span>
+                    <span>{{ txn.reference }}</span>
+                    <span>{{ txn.beneficiary_name }}</span>
+                    <span class="status {{ 'success' if txn.status|lower == 'success' else 'pending' }}">{{ txn.status }}</span>
+                    <span class="amount-col {{ 'credit' if txn.txn_type|lower == 'credit' else 'debit' }}">{{ txn.amount_signed_display }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-row">No transactions found yet.</div>
+            {% endif %}
+        </section>
+    </main>
+    <script>
+        const downloadPdfBtn = document.getElementById("downloadPdfBtn");
+        const statementRows = Array.from(document.querySelectorAll(".table-row"));
+        const statementTitle = "AI BANK - Account Statement";
+        const statementSub = "{{ user_name }}{% if account_number %} | A/C {{ account_number }}{% endif %}";
+
+        function extractRowText(rowEl) {
+            const cells = Array.from(rowEl.querySelectorAll("span")).map((el) => (el.textContent || "").trim());
+            return {
+                date: cells[0] || "",
+                reference: cells[1] || "",
+                beneficiary: cells[2] || "",
+                status: cells[3] || "",
+                amount: cells[4] || "",
+            };
+        }
+
+        function downloadStatementPdf() {
+            const jspdfLib = window.jspdf;
+            if (!jspdfLib || !jspdfLib.jsPDF) return;
+
+            const { jsPDF } = jspdfLib;
+            const doc = new jsPDF();
+            let y = 16;
+
+            doc.setFontSize(16);
+            doc.text(statementTitle, 14, y);
+            y += 8;
+
+            doc.setFontSize(11);
+            doc.text(statementSub, 14, y);
+            y += 10;
+
+            doc.setFontSize(10);
+            doc.text("Date", 14, y);
+            doc.text("Reference", 54, y);
+            doc.text("Beneficiary", 98, y);
+            doc.text("Status", 148, y);
+            doc.text("Amount", 176, y, { align: "right" });
+            y += 4;
+            doc.line(14, y, 196, y);
+            y += 6;
+
+            const rows = statementRows.map(extractRowText);
+            if (rows.length === 0) {
+                doc.text("No transactions found.", 14, y);
+            } else {
+                rows.forEach((row) => {
+                    if (y > 282) {
+                        doc.addPage();
+                        y = 16;
+                    }
+                    doc.text(row.date.slice(0, 24), 14, y);
+                    doc.text(row.reference.slice(0, 20), 54, y);
+                    doc.text(row.beneficiary.slice(0, 24), 98, y);
+                    doc.text(row.status.slice(0, 10), 148, y);
+                    doc.text(row.amount.slice(0, 16), 176, y, { align: "right" });
+                    y += 7;
+                });
+            }
+
+            const fileNameBase = "{{ (user_name or 'customer')|replace(' ', '_') }}";
+            doc.save(`${fileNameBase}_statement.pdf`);
+        }
+
+        if (downloadPdfBtn) {
+            downloadPdfBtn.addEventListener("click", downloadStatementPdf);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bank Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}" />
+</head>
+<body>
+    <main class="dashboard">
+        <section class="main-pane">
+            <header class="topbar">
+                <div class="brand">
+                    <div class="logo">AI</div>
+                    <h1>S.E.T.U</h1>
+                </div>
+                <div class="top-icons">
+                    <div class="icon-badge">2</div>
+                    <div class="avatar">S</div>
+                </div>
+            </header>
+
+            <section class="greet">
+                <h2>Hello, {{ user_name or "Shravani" }}</h2>
+                <p>Good morning</p>
+            </section>
+
+            <section class="balance-card">
+                <p class="muted">Account Balance</p>
+                <h3>Rs 12,450.00</h3>
+                <p class="muted">Savings Account</p>
+                <p class="muted">A/C No: {{ account_number or "Not available" }}</p>
+                <p class="muted">Customer ID: {{ customer_id or "Not available" }}</p>
+                <p class="muted">IFSC: {{ ifsc_code or "Not available" }} | Branch: {{ branch_name or "Not available" }}</p>
+                <div class="balance-actions">
+                    <button class="soft-btn">Updated 5 min ago</button>
+                    <button id="viewStatementBtn" class="cta-btn">View Statement</button>
+                </div>
+            </section>
+
+            <section class="quick-actions">
+                <div class="row-head">
+                    <h3>Quick Actions</h3>
+                    <a href="#">View All</a>
+                </div>
+                <div class="actions-grid">
+                    <button id="sendMoneyBtn">Send</button>
+                    <button id="receiveMoneyBtn" type="button" disabled>Request</button>
+                    <button>Pay Bills</button>
+                    <button>Scan and Pay</button>
+                </div>
+            </section>
+
+            <section class="lower-grid">
+                <div class="transactions card">
+                    <h3>Recent Transactions</h3>
+                    <ul>
+                        {% if recent_transactions and recent_transactions|length > 0 %}
+                            {% for txn in recent_transactions[:3] %}
+                            <li>
+                                <span>{{ txn.beneficiary_name }}</span>
+                                <strong>{{ txn.amount_signed_display }}</strong>
+                            </li>
+                            {% endfor %}
+                        {% else %}
+                            <li><span>No recent payments</span><strong>-</strong></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="insights card">
+                    <h3>Insights</h3>
+                    <p>You spent Rs 2,500 on food last week. Consider setting a weekly budget.</p>
+                </div>
+            </section>
+
+            <nav class="bottom-nav main-nav">
+                <a class="active" href="#">Home</a>
+                <a href="#">Payment</a>
+                <a href="#">Profile</a>
+            </nav>
+        </section>
+
+        <aside class="assistant-pane">
+            <div class="assistant-card">
+                <div class="assistant-head">
+                    <div class="assistant-title">AI Assistant <span class="dot"></span></div>
+                    <span>...</span>
+                </div>
+
+                <div class="assistant-body" id="assistantBody">
+                    <div class="bubble bot">
+                        Hi Shravani! I can help with your banking needs. What can I do for you today?
+                    </div>
+                    <ul class="suggestions" id="assistantSuggestions">
+                        <li>Send money to a friend</li>
+                        <li>Check my account balance</li>
+                        <li>Pay my electricity bill</li>
+                    </ul>
+                </div>
+
+                <div class="assistant-input">
+                    <button type="button" id="voiceBtn" class="voice-btn" title="Voice to text">Mic</button>
+                    <input type="text" id="assistantInput" placeholder="Ask me anything..." />
+                    <button type="button" id="assistantSendBtn">Send</button>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+    <script>
+        const voiceBtn = document.getElementById("voiceBtn");
+        const assistantInput = document.getElementById("assistantInput");
+        const assistantSendBtn = document.getElementById("assistantSendBtn");
+        const assistantBody = document.getElementById("assistantBody");
+        const assistantSuggestions = document.getElementById("assistantSuggestions");
+        const sendMoneyBtn = document.getElementById("sendMoneyBtn");
+        const viewStatementBtn = document.getElementById("viewStatementBtn");
+        const currentUserId = "{{ user_id or '' }}";
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+        if (sendMoneyBtn) {
+            sendMoneyBtn.addEventListener("click", () => {
+                const encoded = encodeURIComponent(currentUserId || "");
+                window.location.href = encoded ? `/send-money?user_id=${encoded}` : "/send-money";
+            });
+        }
+
+        if (viewStatementBtn) {
+            viewStatementBtn.addEventListener("click", () => {
+                const encoded = encodeURIComponent(currentUserId || "");
+                window.location.href = encoded ? `/view-statement?user_id=${encoded}` : "/view-statement";
+            });
+        }
+
+        function addAssistantBubble(text, role) {
+            if (!assistantBody) return;
+            const bubble = document.createElement("div");
+            bubble.className = `bubble ${role}`;
+
+            if (role === "bot") {
+                const raw = String(text || "").trim();
+                const lines = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+                const stepLines = lines.filter((line) => /^\d+\.\s+/.test(line));
+                const introLines = lines.filter((line) => !/^\d+\.\s+/.test(line));
+
+                if (introLines.length > 0) {
+                    const intro = document.createElement("p");
+                    intro.className = "bubble-intro";
+                    intro.textContent = introLines.join(" ");
+                    bubble.appendChild(intro);
+                }
+
+                if (stepLines.length > 0) {
+                    const list = document.createElement("ol");
+                    list.className = "bubble-steps";
+                    stepLines.forEach((line) => {
+                        const item = document.createElement("li");
+                        item.textContent = line.replace(/^\d+\.\s+/, "");
+                        list.appendChild(item);
+                    });
+                    bubble.appendChild(list);
+                }
+
+                if (introLines.length === 0 && stepLines.length === 0) {
+                    bubble.textContent = raw;
+                }
+            } else {
+                bubble.textContent = text;
+            }
+
+            assistantBody.appendChild(bubble);
+            assistantBody.scrollTop = assistantBody.scrollHeight;
+        }
+
+        async function sendAssistantMessage(message) {
+            const msg = (message || "").trim();
+            if (!msg || !assistantInput || !assistantSendBtn) return;
+
+            addAssistantBubble(msg, "user");
+            assistantInput.value = "";
+            assistantSendBtn.disabled = true;
+            const oldLabel = assistantSendBtn.textContent;
+            assistantSendBtn.textContent = "Sending...";
+
+            try {
+                const res = await fetch("/dashboard-chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg })
+                });
+                const data = await res.json();
+                addAssistantBubble((data && data.reply) || "I could not understand that. Please try again.", "bot");
+            } catch (err) {
+                addAssistantBubble("I could not connect right now. Please try again.", "bot");
+            } finally {
+                assistantSendBtn.disabled = false;
+                assistantSendBtn.textContent = oldLabel;
+            }
+        }
+
+        if (assistantSendBtn && assistantInput) {
+            assistantSendBtn.addEventListener("click", () => sendAssistantMessage(assistantInput.value));
+            assistantInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") sendAssistantMessage(assistantInput.value);
+            });
+        }
+
+        if (assistantSuggestions) {
+            assistantSuggestions.querySelectorAll("li").forEach((item) => {
+                item.addEventListener("click", () => sendAssistantMessage(item.textContent || ""));
+            });
+        }
+
+        if (SpeechRecognition && voiceBtn && assistantInput) {
+            const recognition = new SpeechRecognition();
+            recognition.lang = "en-IN";
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.addEventListener("start", () => {
+                voiceBtn.classList.add("listening");
+                voiceBtn.textContent = "Listening";
+            });
+
+            recognition.addEventListener("result", (event) => {
+                const transcript = event.results[0][0].transcript || "";
+                assistantInput.value = transcript.trim();
+                sendAssistantMessage(assistantInput.value);
+            });
+
+            recognition.addEventListener("end", () => {
+                voiceBtn.classList.remove("listening");
+                voiceBtn.textContent = "Mic";
+            });
+
+            voiceBtn.addEventListener("click", () => {
+                recognition.start();
+            });
+        } else if (voiceBtn) {
+            voiceBtn.disabled = true;
+            voiceBtn.title = "Voice input is not supported in this browser";
+        }
+    </script>
+</body>
+</html>

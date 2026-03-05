@@ -1,0 +1,285 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap');
+
+:root {
+    --bg-soft: #eef1f7;
+    --panel: #ffffff;
+    --text-dark: #1e2a3a;
+    --bubble: #f2f4f8;
+    --user-bubble: #f7e9c8;
+    --border: #dce2ec;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Manrope', sans-serif;
+    min-height: 100vh;
+    background: radial-gradient(circle at 20% 20%, #f7f9ff 0%, var(--bg-soft) 55%, #e8edf8 100%);
+    color: var(--text-dark);
+}
+
+.page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+}
+
+.hero {
+    position: relative;
+    overflow: hidden;
+    padding: 52px 56px;
+    color: #ecf4ff;
+    background:
+        radial-gradient(1200px 600px at 85% 50%, rgba(115, 198, 255, 0.45), transparent 58%),
+        radial-gradient(700px 400px at 70% 80%, rgba(63, 140, 244, 0.35), transparent 62%),
+        linear-gradient(145deg, #122a70 0%, #1750b8 45%, #2a7ef0 100%);
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 120px;
+}
+
+.logo {
+    width: 88px;
+    height: 72px;
+    border-radius: 18px;
+    display: grid;
+    place-items: center;
+    font-size: 30px;
+    font-weight: 800;
+    background: linear-gradient(145deg, #4da0ff, #1360c4);
+}
+
+.brand h1 {
+    letter-spacing: 1.2px;
+    font-size: clamp(30px, 3vw, 50px);
+    font-weight: 800;
+}
+
+.hero-title {
+    font-size: clamp(38px, 5vw, 72px);
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 26px;
+    max-width: 700px;
+}
+
+.hero-copy {
+    font-size: clamp(20px, 2.1vw, 36px);
+    line-height: 1.32;
+    max-width: 620px;
+    color: rgba(229, 244, 255, 0.9);
+    margin-bottom: 44px;
+}
+
+.actions {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-width: 380px;
+}
+
+.login-panel {
+    margin-top: 16px;
+    max-width: 380px;
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(190, 219, 255, 0.52);
+    background: rgba(13, 39, 101, 0.42);
+}
+
+.login-panel.hidden {
+    display: none;
+}
+
+.login-panel h3 {
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.login-panel input {
+    border: 1px solid rgba(196, 219, 255, 0.7);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 16px;
+    color: #e9f3ff;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.login-panel input::placeholder {
+    color: rgba(228, 241, 255, 0.8);
+}
+
+.login-panel button {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #21539b;
+    background: #eaf2ff;
+    cursor: pointer;
+}
+
+.login-panel p {
+    min-height: 18px;
+    font-size: 14px;
+    color: #ffd9d9;
+}
+
+.btn {
+    border: 0;
+    border-radius: 22px;
+    font-size: clamp(24px, 2.2vw, 44px);
+    font-weight: 800;
+    padding: 18px 22px;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+}
+
+.btn-primary {
+    color: #fff;
+    background: linear-gradient(90deg, #58cf83 0%, #4fcf7c 40%, #44bd6e 100%);
+}
+
+.btn-secondary {
+    color: #dcecff;
+    background: transparent;
+    border: 3px solid rgba(190, 219, 255, 0.72);
+}
+
+.chat-panel {
+    display: grid;
+    place-items: center;
+    padding: 40px 28px;
+}
+
+.chat-card {
+    width: min(720px, 95%);
+    height: min(88vh, 960px);
+    background: var(--panel);
+    border-radius: 24px;
+    border: 1px solid #e6ebf2;
+    box-shadow: 0 12px 42px rgba(29, 53, 97, 0.08);
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    overflow: hidden;
+}
+
+.chat-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.assistant {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: clamp(22px, 2vw, 36px);
+    font-weight: 700;
+}
+
+.status {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #54cd7f;
+}
+
+.menu-dot {
+    font-size: 30px;
+    color: #6f7e97;
+}
+
+.chat-body {
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #fcfdff;
+}
+
+.message {
+    max-width: 92%;
+    padding: 16px 18px;
+    border-radius: 20px;
+    font-size: clamp(20px, 1.5vw, 30px);
+    line-height: 1.35;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.bot {
+    align-self: flex-start;
+    background: var(--bubble);
+}
+
+.user {
+    align-self: flex-end;
+    background: var(--user-bubble);
+}
+
+.chat-input {
+    border-top: 1px solid var(--border);
+    padding: 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    background: #fff;
+}
+
+.chat-input input {
+    border: 1px solid #d6deea;
+    border-radius: 18px;
+    padding: 16px;
+    font-size: clamp(18px, 1.3vw, 28px);
+    outline: none;
+}
+
+.chat-input button {
+    border: 0;
+    border-radius: 16px;
+    padding: 0 22px;
+    font-size: clamp(18px, 1.2vw, 28px);
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(145deg, #4991f3, #256dd9);
+    cursor: pointer;
+}
+
+@media (max-width: 1080px) {
+    .page {
+        grid-template-columns: 1fr;
+    }
+
+    .hero {
+        padding: 32px 22px;
+    }
+
+    .brand {
+        margin-bottom: 40px;
+    }
+
+    .chat-panel {
+        padding: 22px;
+    }
+
+    .chat-card {
+        width: 100%;
+        height: 72vh;
+    }
+}

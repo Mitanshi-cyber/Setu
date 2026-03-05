@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bank - Send Money</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/send_money.css') }}" />
+</head>
+<body>
+    <main class="send-page">
+        <section class="contacts-pane">
+            <h1>Send Money</h1>
+            <p>Dummy contacts</p>
+            <div id="contactsList" class="contacts-list"></div>
+            <a class="back-link" href="{{ '/dashboard?user_id=' + user_id if user_id else '/dashboard' }}">Back to Dashboard</a>
+        </section>
+
+        <section class="ai-pane">
+            <div class="chat-card">
+                <div class="chat-head">
+                    <strong>AI Transfer Assistant</strong>
+                    <span class="dot"></span>
+                </div>
+                <div id="chatBody" class="chat-body"></div>
+                <div id="transferSummary" class="transfer-summary hidden"></div>
+                <div class="chat-input">
+                    <input id="chatInput" type="text" placeholder="Type: Send money to XYZ" />
+                    <button id="chatSendBtn" type="button">Send</button>
+                </div>
+                <div class="pay-row">
+                    <button id="payBtn" type="button" disabled>Pay</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const userId = "{{ user_id or '' }}";
+        const contacts = [
+            { name: "XYZ", upi: "xyz@aibank" },
+            { name: "Rahul", upi: "rahul@aibank" },
+            { name: "Anita", upi: "anita@aibank" },
+            { name: "Karan", upi: "karan@aibank" },
+            { name: "Meera", upi: "meera@aibank" },
+            { name: "Neha", upi: "neha@aibank" },
+            { name: "Arjun", upi: "arjun@aibank" },
+            { name: "Priya", upi: "priya@aibank" },
+            { name: "Vikram", upi: "vikram@aibank" },
+            { name: "Sana", upi: "sana@aibank" }
+        ];
+
+        const contactsList = document.getElementById("contactsList");
+        const chatBody = document.getElementById("chatBody");
+        const chatInput = document.getElementById("chatInput");
+        const chatSendBtn = document.getElementById("chatSendBtn");
+        const payBtn = document.getElementById("payBtn");
+        const transferSummary = document.getElementById("transferSummary");
+
+        let selectedContact = null;
+        let selectedAmount = null;
+        let awaitingAmount = false;
+
+        function normalize(v) {
+            return String(v || "").trim().toLowerCase();
+        }
+
+        function addBubble(text, role) {
+            const el = document.createElement("div");
+            el.className = `bubble ${role}`;
+            el.textContent = text;
+            chatBody.appendChild(el);
+            chatBody.scrollTop = chatBody.scrollHeight;
+        }
+
+        function renderContacts() {
+            contactsList.innerHTML = "";
+            contacts.forEach((c) => {
+                const row = document.createElement("button");
+                row.type = "button";
+                row.className = "contact-item";
+                row.innerHTML = `<strong>${c.name}</strong><span>${c.upi}</span>`;
+                row.addEventListener("click", () => {
+                    setSelectedContact(c);
+                    addBubble(`Send money to ${c.name}`, "user");
+                    addBubble(`Selected ${c.name}. Please enter amount.`, "bot");
+                    awaitingAmount = true;
+                });
+                contactsList.appendChild(row);
+            });
+        }
+
+        function setSelectedContact(contact) {
+            selectedContact = contact;
+            Array.from(contactsList.querySelectorAll(".contact-item")).forEach((btn) => {
+                btn.classList.toggle("active", btn.textContent.toLowerCase().includes(contact.name.toLowerCase()));
+            });
+            updateSummary();
+        }
+
+        function updateSummary() {
+            if (!selectedContact) {
+                transferSummary.classList.add("hidden");
+                payBtn.disabled = true;
+                return;
+            }
+            const amountText = selectedAmount ? `Rs ${selectedAmount.toFixed(2)}` : "Not entered";
+            transferSummary.classList.remove("hidden");
+            transferSummary.innerHTML = `
+                <div><strong>Contact:</strong> ${selectedContact.name}</div>
+                <div><strong>UPI:</strong> ${selectedContact.upi}</div>
+                <div><strong>Amount:</strong> ${amountText}</div>
+            `;
+            payBtn.disabled = !(selectedContact && selectedAmount && selectedAmount > 0);
+        }
+
+        function findContactFromMessage(msg) {
+            const text = normalize(msg);
+            const sendMatch = text.match(/send money to\s+([a-z0-9 ]+)/i);
+            if (sendMatch && sendMatch[1]) {
+                const target = normalize(sendMatch[1]);
+                return contacts.find((c) => normalize(c.name) === target) ||
+                    contacts.find((c) => normalize(c.name).includes(target) || target.includes(normalize(c.name)));
+            }
+            return contacts.find((c) => text.includes(normalize(c.name)));
+        }
+
+        function parseAmount(msg) {
+            const num = String(msg || "").replace(/,/g, "").match(/\d+(\.\d+)?/);
+            if (!num) return null;
+            const value = Number(num[0]);
+            if (!Number.isFinite(value) || value <= 0) return null;
+            return value;
+        }
+
+        function handleMessage() {
+            const msg = chatInput.value.trim();
+            if (!msg) return;
+            addBubble(msg, "user");
+            chatInput.value = "";
+
+            const contact = findContactFromMessage(msg);
+            if (contact) {
+                setSelectedContact(contact);
+                awaitingAmount = true;
+                addBubble(`${contact.name} found. Please enter amount to pay.`, "bot");
+                return;
+            }
+
+            if (awaitingAmount && selectedContact) {
+                const amt = parseAmount(msg);
+                if (!amt) {
+                    addBubble("Please enter a valid amount (for example 500).", "bot");
+                    return;
+                }
+                selectedAmount = amt;
+                awaitingAmount = false;
+                updateSummary();
+                addBubble(`Amount captured: Rs ${amt.toFixed(2)}. Click Pay to continue.`, "bot");
+                return;
+            }
+
+            addBubble("Say: Send money to XYZ, then enter amount.", "bot");
+        }
+
+        payBtn.addEventListener("click", () => {
+            if (!selectedContact || !selectedAmount) return;
+            const qUser = encodeURIComponent(userId || "");
+            const qContact = encodeURIComponent(selectedContact.name);
+            const qAmount = encodeURIComponent(selectedAmount.toFixed(2));
+            window.location.href = `/send-money/pin?user_id=${qUser}&contact=${qContact}&amount=${qAmount}`;
+        });
+
+        chatSendBtn.addEventListener("click", handleMessage);
+        chatInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") handleMessage();
+        });
+
+        renderContacts();
+        addBubble("Tell me who to pay. Example: Send money to XYZ", "bot");
+    </script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Bank Welcome</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/welcome.css') }}" />
+</head>
+<body>
+    <main class="page">
+        <section class="hero">
+            <div class="brand">
+                <div class="logo" aria-hidden="true">AI</div>
+                <h1>S.E.T.U</h1>
+            </div>
+
+            <h2 class="hero-title">Welcome to AI Bank</h2>
+            <p class="hero-copy">Open your account in minutes using AI-powered assistance.</p>
+
+            <div class="actions">
+                <a class="btn btn-primary" href="{{ url_for('get_started') }}">Get Started</a>
+                <button id="openLoginBtn" class="btn btn-secondary" type="button">Login</button>
+            </div>
+
+            <div id="loginPanel" class="login-panel hidden">
+                <h3>Login</h3>
+                <input id="loginMobile" type="text" maxlength="10" placeholder="Mobile Number" />
+                <input id="loginPin" type="password" maxlength="6" placeholder="4/6 digit PIN" />
+                <button id="loginSubmitBtn" type="button">Continue</button>
+                <p id="loginStatus"></p>
+            </div>
+        </section>
+
+        <section class="chat-panel">
+            <div class="chat-card">
+                <div class="chat-header">
+                    <div class="assistant">
+                       
+                        <span>AI Assistant</span>
+                        <span class="status"></span>
+                    </div>
+                    <span class="menu-dot">...</span>
+                </div>
+
+                <div id="chatbox" class="chat-body"></div>
+
+                <div class="chat-input">
+                    <input id="msg" type="text" placeholder="Ask me anything..." />
+                    <button id="sendBtn" type="button">Send</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const chatbox = document.getElementById("chatbox");
+        const messageInput = document.getElementById("msg");
+        const sendBtn = document.getElementById("sendBtn");
+        const openLoginBtn = document.getElementById("openLoginBtn");
+        const loginPanel = document.getElementById("loginPanel");
+        const loginMobile = document.getElementById("loginMobile");
+        const loginPin = document.getElementById("loginPin");
+        const loginSubmitBtn = document.getElementById("loginSubmitBtn");
+        const loginStatus = document.getElementById("loginStatus");
+
+        function addMessage(text, role) {
+            const div = document.createElement("div");
+            div.className = `message ${role}`;
+            div.textContent = text;
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const msg = messageInput.value.trim();
+            if (!msg) return;
+
+            addMessage(msg, "user");
+            messageInput.value = "";
+
+            try {
+                const res = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: msg })
+                });
+
+                const data = await res.json();
+                addMessage(data.reply || "No response", "bot");
+            } catch (error) {
+                addMessage("I could not connect. Please try again.", "bot");
+            }
+        }
+
+        sendBtn.addEventListener("click", sendMessage);
+        messageInput.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") sendMessage();
+        });
+
+        if (openLoginBtn && loginPanel) {
+            openLoginBtn.addEventListener("click", () => {
+                loginPanel.classList.toggle("hidden");
+                if (!loginPanel.classList.contains("hidden") && loginMobile) {
+                    loginMobile.focus();
+                }
+            });
+        }
+
+        async function loginNow() {
+            const mobile = (loginMobile?.value || "").trim();
+            const pin = (loginPin?.value || "").trim();
+
+            if (!/^\d{10}$/.test(mobile)) {
+                loginStatus.textContent = "Enter a valid 10-digit mobile number.";
+                return;
+            }
+            if (!/^(\d{4}|\d{6})$/.test(pin)) {
+                loginStatus.textContent = "Enter a valid 4/6 digit PIN.";
+                return;
+            }
+
+            loginSubmitBtn.disabled = true;
+            loginSubmitBtn.textContent = "Verifying...";
+            loginStatus.textContent = "";
+
+            try {
+                const res = await fetch("/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ mobile, pin })
+                });
+                const data = await res.json();
+                if (!res.ok || !data || !data.ok) {
+                    loginStatus.textContent = (data && data.error) || "Login failed.";
+                    return;
+                }
+
+                window.location.href = data.redirect_url || "/dashboard";
+            } catch (error) {
+                loginStatus.textContent = "Could not connect. Please try again.";
+            } finally {
+                loginSubmitBtn.disabled = false;
+                loginSubmitBtn.textContent = "Continue";
+            }
+        }
+
+        if (loginSubmitBtn) {
+            loginSubmitBtn.addEventListener("click", loginNow);
+        }
+        if (loginPin) {
+            loginPin.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") loginNow();
+            });
+        }
+
+        addMessage("Hi! I can help you open your account. Ask me anything!", "bot");
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap');
+
+:root {
+    --bg: #eef2f9;
+    --panel: #ffffff;
+    --ink: #1f3560;
+    --muted: #5e7191;
+    --border: #d9e2ee;
+    --primary: #2d7ce8;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+    font-family: "Manrope", sans-serif;
+    background: radial-gradient(circle at 20% 15%, #f8fbff 0%, #edf2f9 52%, #e6ecf7 100%);
+    color: var(--ink);
+}
+
+.send-page {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 16px;
+    padding: 18px;
+}
+
+.contacts-pane {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--panel);
+    padding: 18px;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 8px;
+}
+
+.contacts-pane h1 {
+    font-size: 30px;
+}
+
+.contacts-pane p {
+    color: var(--muted);
+}
+
+.contacts-list {
+    display: grid;
+    gap: 8px;
+    overflow-y: auto;
+}
+
+.contact-item {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    display: grid;
+    gap: 2px;
+}
+
+.contact-item span {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.contact-item.active {
+    border-color: #88afea;
+    background: #ecf4ff;
+}
+
+.ai-pane {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    background: var(--panel);
+    overflow: hidden;
+}
+
+.chat-card {
+    height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto auto auto;
+}
+
+.chat-head {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #46c07c;
+}
+
+.chat-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+}
+
+.bubble {
+    max-width: 86%;
+    border-radius: 14px;
+    padding: 10px 12px;
+    line-height: 1.4;
+}
+
+.bubble.bot {
+    align-self: flex-start;
+    background: #f2f5fb;
+}
+
+.bubble.user {
+    align-self: flex-end;
+    background: #e9f1ff;
+}
+
+.transfer-summary {
+    margin: 0 12px 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: #f8fbff;
+    padding: 10px 12px;
+    display: grid;
+    gap: 4px;
+}
+
+.transfer-summary.hidden {
+    display: none;
+}
+
+.chat-input {
+    border-top: 1px solid var(--border);
+    padding: 10px 12px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+}
+
+.chat-input input {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.chat-input button,
+#payBtn,
+#confirmPayBtn {
+    border: 0;
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: #fff;
+    font-weight: 700;
+    background: linear-gradient(145deg, #4d95f4, #2a72df);
+    cursor: pointer;
+}
+
+#payBtn:disabled,
+#confirmPayBtn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.pay-row {
+    border-top: 1px solid var(--border);
+    padding: 10px 12px 12px;
+}
+
+.back-link {
+    text-decoration: none;
+    color: #2c70d8;
+    font-weight: 700;
+}
+
+.pin-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+}
+
+.pin-card {
+    width: min(460px, 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--panel);
+    padding: 18px;
+    display: grid;
+    gap: 10px;
+}
+
+.pin-card h1 {
+    font-size: 28px;
+}
+
+.pin-card label {
+    font-weight: 700;
+}
+
+.pin-card input {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.status {
+    min-height: 20px;
+}
+
+.status.sending {
+    color: #49658f;
+}
+
+.status.success {
+    color: #1f9e6e;
+    font-weight: 700;
+}
+
+.status.error {
+    color: #bf4f43;
+    font-weight: 700;
+}
+
+@media (max-width: 980px) {
+    .send-page {
+        grid-template-columns: 1fr;
+    }
+}
