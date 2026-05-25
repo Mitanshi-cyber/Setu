@@ -1,4 +1,4 @@
-## AI-Powered Digital Wallet ##
+# AI-Powered Digital Wallet #
 A fullsrack fintech web aplication with AI assistant integration. Built this to explore how real banking interfaces work and how AI can be embedded into financial workflows.
 
 # Features #
